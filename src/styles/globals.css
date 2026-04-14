@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Default color scheme — One Half Dark inspired. ColorProfile system will
+   override these CSS variables at runtime when a profile is activated. */
+:root {
+  --prossh-bg: 24 26 33;
+  --prossh-bg-elevated: 32 34 43;
+  --prossh-bg-overlay: 40 42 54;
+  --prossh-fg: 220 223 228;
+  --prossh-fg-muted: 152 159 171;
+  --prossh-fg-subtle: 100 105 119;
+  --prossh-accent: 97 175 239;
+  --prossh-accent-hover: 130 190 244;
+  --prossh-border: 60 64 76;
+  --prossh-border-subtle: 44 47 57;
+  --prossh-success: 152 195 121;
+  --prossh-warning: 229 192 123;
+  --prossh-danger: 224 108 117;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: theme("fontFamily.sans");
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+/* Custom scrollbar that matches theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--prossh-border));
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--prossh-fg-subtle));
+}
+
+/* Drag region for the custom titlebar */
+.titlebar-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

@@ -1,0 +1,107 @@
+[package]
+name = "prossh"
+version = "0.1.0"
+description = "Cross-platform SSH/SFTP client"
+authors = ["Proyavlenie <mail@yavlenie.pro>"]
+edition = "2021"
+rust-version = "1.77"
+license-file = "../LICENSE"
+homepage = "https://github.com/yavlenie-pro/prossh"
+repository = "https://github.com/yavlenie-pro/prossh"
+publish = false
+
+[lib]
+name = "prossh_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# --- Tauri core ---
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-os = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-single-instance = "2"
+
+# --- Async runtime ---
+tokio = { version = "1.40", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# --- Serialization / error handling ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+anyhow = "1"
+
+# --- Misc utilities ---
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+parking_lot = "0.12"
+once_cell = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sha2 = "0.10"
+base64 = "0.22"
+
+# --- Persistence (step 2) ---
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
+
+# --- OS keychain (step 3) ---
+# Cross-platform secret storage. On Windows uses Credential Manager, on macOS
+# uses Keychain, on Linux talks to the freedesktop Secret Service (gnome-keyring
+# or kwallet) via pure-Rust dbus — crypto-rust avoids OpenSSL as a build dep.
+keyring = { version = "3", features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+    "crypto-rust",
+] }
+
+# --- SSH core (step 5) ---
+# russh is a pure-Rust SSH implementation. We deliberately disable the default
+# `aws-lc-rs` crypto backend because `aws-lc-sys` requires NASM to build on
+# Windows — `ring` is pure Rust on MSVC and doesn't need any system toolchain.
+# We keep `flate2` (compression) and `rsa` (RSA keys, which are still the most
+# common choice on legacy servers).
+# `russh::keys` re-exports ssh-key types we need for fingerprints & PublicKey.
+russh = { version = "0.60", default-features = false, features = [
+    "ring",
+    "flate2",
+    "rsa",
+] }
+bytes = "1"
+
+# --- SSH config parser (step 10) ---
+ssh2-config = "0.4"
+
+# --- Windows registry for PuTTY/MobaXTerm import ---
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+
+# --- SFTP (steps 12-14) ---
+russh-sftp = "2"
+tokio-util = { version = "0.7", features = ["compat", "rt"] }
+
+# --- Drag-out from webview to OS ---
+tauri-plugin-drag = "2"
+
+# --- Open files with the system default app ---
+open = "5"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+codegen-units = 4
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
