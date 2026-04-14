@@ -64,7 +64,7 @@ Keyboard shortcuts:
 ## Building from source
 
 ```bash
-# prerequisites: Node.js 20+, Rust 1.77+, platform webview/build deps (see docs/DEVELOPMENT.md)
+# prerequisites: Node.js 20+, Rust 1.80+, platform webview/build deps (see docs/DEVELOPMENT.md)
 npm ci
 npm run tauri dev      # hot-reloaded dev build
 npm run tauri build    # release bundle in src-tauri/target/release/bundle/

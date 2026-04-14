@@ -85,7 +85,7 @@ prossh/
 | Инструмент | Версия | Заметки |
 | --- | --- | --- |
 | Node.js | 20 LTS или новее | `npm ci` использует `package-lock.json`. |
-| Rust | 1.77+ (stable) | Ставится через [rustup](https://rustup.rs/). `cargo`, `rustc`, `clippy`, `rustfmt`. |
+| Rust | 1.80+ (stable) | Ставится через [rustup](https://rustup.rs/). `cargo`, `rustc`, `clippy`, `rustfmt`. |
 | Платформенный toolchain | см. ниже | C-линкер для нативных зависимостей. |
 
 **Windows**: MSVC Build Tools 2019+ (aka Visual Studio Build Tools с workload'ом "Desktop development with C++"). WebView2 runtime предустановлен на Windows 11. NASM **не нужен** — `russh` сконфигурирован на `ring` (pure Rust).

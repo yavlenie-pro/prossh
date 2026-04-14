@@ -85,7 +85,7 @@ prossh/
 | Tool | Version | Notes |
 | --- | --- | --- |
 | Node.js | 20 LTS or newer | `npm ci` uses `package-lock.json`. |
-| Rust | 1.77+ (stable) | Install via [rustup](https://rustup.rs/). `cargo`, `rustc`, `clippy`, `rustfmt`. |
+| Rust | 1.80+ (stable) | Install via [rustup](https://rustup.rs/). `cargo`, `rustc`, `clippy`, `rustfmt`. |
 | Platform toolchain | see below | C linker for native deps. |
 
 **Windows**: MSVC Build Tools 2019+ (aka Visual Studio Build Tools with the "Desktop development with C++" workload). WebView2 runtime is preinstalled on Windows 11. No NASM needed — `russh` is configured to use the pure-Rust `ring` crypto backend.

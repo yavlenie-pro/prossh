@@ -67,7 +67,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_drag::init())
         .setup(|app| {
-            let state = AppState::new(&app.handle())?;
+            let state = AppState::new(app.handle())?;
 
             // Write diagnostic info to a log file on the desktop so we can
             // debug path issues without a console window.

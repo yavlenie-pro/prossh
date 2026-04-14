@@ -312,7 +312,6 @@ pub async fn remote_stats_slow(
     let hostname = sections[2].trim().to_string();
 
     let uptime_secs = sections[3]
-        .trim()
         .split_whitespace()
         .next()
         .and_then(|s| s.parse::<f64>().ok())
@@ -375,7 +374,6 @@ fn parse_stats(raw: &str) -> Result<RemoteStats, AppError> {
     let (ram_total, ram_used, swap_total, swap_used) = parse_meminfo(sections[7].trim());
     let disks = parse_df(sections[8].trim());
     let uptime_secs = sections[9]
-        .trim()
         .split_whitespace()
         .next()
         .and_then(|s| s.parse::<f64>().ok())

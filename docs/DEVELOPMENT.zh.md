@@ -85,7 +85,7 @@ prossh/
 | 工具 | 版本 | 备注 |
 | --- | --- | --- |
 | Node.js | 20 LTS 或更新 | `npm ci` 使用 `package-lock.json`。 |
-| Rust | 1.77+(stable) | 通过 [rustup](https://rustup.rs/) 安装。`cargo`、`rustc`、`clippy`、`rustfmt`。 |
+| Rust | 1.80+(stable) | 通过 [rustup](https://rustup.rs/) 安装。`cargo`、`rustc`、`clippy`、`rustfmt`。 |
 | 平台工具链 | 见下文 | 原生依赖的 C 链接器。 |
 
 **Windows**:MSVC Build Tools 2019+(即带有 "Desktop development with C++" 工作负载的 Visual Studio Build Tools)。Windows 11 已预装 WebView2 运行时。不需要 NASM——`russh` 被配置为使用纯 Rust 的 `ring` 加密后端。

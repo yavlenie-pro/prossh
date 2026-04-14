@@ -64,7 +64,7 @@ ProSSH — десктопный SSH-клиент на Rust + React поверх 
 ## Сборка из исходников
 
 ```bash
-# требования: Node.js 20+, Rust 1.77+, платформенные webview/build-зависимости (см. docs/DEVELOPMENT.md)
+# требования: Node.js 20+, Rust 1.80+, платформенные webview/build-зависимости (см. docs/DEVELOPMENT.md)
 npm ci
 npm run tauri dev      # dev-сборка с hot reload
 npm run tauri build    # release-бандл в src-tauri/target/release/bundle/

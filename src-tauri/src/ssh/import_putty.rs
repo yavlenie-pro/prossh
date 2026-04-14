@@ -83,6 +83,7 @@ pub fn read_putty_sessions() -> Result<Vec<PuttySession>, AppError> {
     Ok(Vec::new())
 }
 
+#[cfg(windows)]
 fn url_decode(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars();

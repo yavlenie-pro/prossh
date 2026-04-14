@@ -262,6 +262,7 @@ pub async fn sftp_download(
 /// Copy a file directly between two remote servers via SFTP.
 /// Both sessions must already be open (via `sftp_open`).
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn sftp_server_copy(
     state: State<'_, AppState>,
     src_runtime_id: String,
@@ -436,7 +437,7 @@ pub async fn ssh_remote_exec_stream(
                     let _ = kill_ch.exec(true, kill_cmd.as_bytes()).await;
                     let _ = tokio::time::timeout(
                         std::time::Duration::from_secs(3),
-                        async { while let Some(_) = kill_ch.wait().await {} },
+                        async { while kill_ch.wait().await.is_some() {} },
                     ).await;
                 }
                 let _ = channel.close().await;
@@ -907,7 +908,7 @@ pub async fn prepare_server_copy_auth(
 
         // Send the file content through channel stdin
         channel
-            .data(&content[..])
+            .data(content)
             .await
             .map_err(|e| AppError::Ssh(format!("data: {e}")))?;
         // Signal end of stdin

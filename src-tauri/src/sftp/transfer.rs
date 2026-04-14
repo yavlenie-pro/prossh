@@ -210,6 +210,7 @@ pub async fn download(
 /// Copy a file directly between two remote servers (server-to-server).
 /// Reads from `src_sftp` and writes to `dst_sftp` without touching the local
 /// filesystem, streaming data through the client in 64 KiB chunks.
+#[allow(clippy::too_many_arguments)]
 pub async fn server_copy(
     src_sftp: &russh_sftp::client::SftpSession,
     dst_sftp: &russh_sftp::client::SftpSession,
