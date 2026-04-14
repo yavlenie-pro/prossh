@@ -81,10 +81,6 @@ bytes = "1"
 # --- SSH config parser (step 10) ---
 ssh2-config = "0.4"
 
-# --- Windows registry for PuTTY/MobaXTerm import ---
-[target.'cfg(windows)'.dependencies]
-winreg = "0.55"
-
 # --- SFTP (steps 12-14) ---
 russh-sftp = "2"
 tokio-util = { version = "0.7", features = ["compat", "rt"] }
@@ -94,6 +90,10 @@ tauri-plugin-drag = "2"
 
 # --- Open files with the system default app ---
 open = "5"
+
+# --- Windows registry for PuTTY/MobaXTerm import ---
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
 
 [features]
 default = ["custom-protocol"]
