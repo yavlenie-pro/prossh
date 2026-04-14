@@ -85,6 +85,9 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "ProSSH ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install."
-          releaseDraft: true
-          prerelease: false
+          # Publish automatically — no manual "Publish release" click needed.
+          releaseDraft: false
+          # Tags with a dash (v0.1.0-rc.1, v0.1.0-alpha) are pre-releases;
+          # plain semver tags (v0.1.0) go out as full releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
