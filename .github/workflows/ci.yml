@@ -51,6 +51,12 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
+      # Tauri's `generate_context!` macro reads tauri.conf.json at compile time
+      # and panics if `frontendDist` (../dist) doesn't exist. So the Vite bundle
+      # must be built before we invoke cargo.
+      - name: Build frontend
+        run: npm run build
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
