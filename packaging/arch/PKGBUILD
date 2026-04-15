@@ -16,6 +16,14 @@ arch=('x86_64')
 url="https://github.com/yavlenie-pro/prossh"
 license=('custom:PolyForm-Noncommercial-1.0.0')
 depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'librsvg' 'openssl')
+# Runtime extras — none are hard required (ProSSH degrades to prompting
+# the user for each password if no Secret Service provider is available),
+# but with one installed the app can persist passwords across runs.
+optdepends=(
+    'gnome-keyring: freedesktop Secret Service provider for persistent password storage'
+    'libsecret: Secret Service client library'
+    'kwallet: KDE wallet with Secret Service compatibility'
+)
 options=('!strip' '!emptydirs' '!debug')
 
 package() {
