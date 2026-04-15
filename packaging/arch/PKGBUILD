@@ -1,0 +1,35 @@
+# shellcheck shell=bash disable=SC2034,SC2148,SC2154
+# This PKGBUILD is only intended to be run from the CI release workflow
+# (.github/workflows/release.yml). It repacks the .deb produced by
+# `tauri build --bundles deb` into an Arch `.pkg.tar.zst`.
+#
+# Expects, sitting next to this PKGBUILD:
+#   - PROSSH_VERSION environment variable (e.g. 0.1.0rc1 — no hyphens)
+#   - A single ProSSH_*.deb file
+#   - A LICENSE file
+
+pkgname=prossh
+pkgver="${PROSSH_VERSION:?PROSSH_VERSION must be set}"
+pkgrel=1
+pkgdesc="Modern cross-platform SSH/SFTP client with tabs, splits, built-in file manager"
+arch=('x86_64')
+url="https://github.com/yavlenie-pro/prossh"
+license=('custom:PolyForm-Noncommercial-1.0.0')
+depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'librsvg' 'openssl')
+options=('!strip' '!emptydirs' '!debug')
+
+package() {
+    local debfile
+    debfile=$(find "${startdir}" -maxdepth 1 -name 'ProSSH_*.deb' -print -quit)
+    [[ -f "$debfile" ]] || { echo "::error::no ProSSH_*.deb found next to PKGBUILD"; return 1; }
+
+    # A .deb is an `ar` archive that contains data.tar.{gz,xz,zst}.
+    # bsdtar handles both `ar` and the inner tarball formats.
+    (cd "${srcdir}" && bsdtar -xf "$debfile")
+    bsdtar -xf "${srcdir}"/data.tar.* -C "${pkgdir}"
+
+    # The .deb doesn't ship the license; take it from the repo checkout.
+    if [[ -f "${startdir}/LICENSE" ]]; then
+        install -Dm644 "${startdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    fi
+}

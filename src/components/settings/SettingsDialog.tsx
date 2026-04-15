@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Activity, Code2, Copy, Globe, Info, Keyboard, Palette, Pencil, Plus, Search, Server, ShieldCheck, Terminal, Trash2, X } from "lucide-react";
+import { Activity, Code2, Copy, Github, Globe, Info, Keyboard, Palette, Pencil, Plus, Search, Server, ShieldCheck, Terminal, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { ColorProfile, Session } from "@/api/types";
@@ -831,6 +831,15 @@ function AboutPanel() {
             className="text-fg-muted hover:text-accent hover:underline"
           >
             mail@yavlenie.pro
+          </a>
+          <a
+            href="https://github.com/yavlenie-pro/prossh"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1 text-fg-muted hover:text-accent hover:underline"
+          >
+            <Github className="h-3 w-3" aria-hidden />
+            github.com/yavlenie-pro/prossh
           </a>
         </div>
       </div>

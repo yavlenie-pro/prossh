@@ -98,3 +98,93 @@ jobs:
           # plain semver tags (v0.1.0) go out as full releases.
           prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
+
+  build-arch:
+    # Separate job (rather than an extra matrix row) because Arch's tooling —
+    # makepkg, pacman, bsdtar — doesn't map onto GitHub's ubuntu/macos/windows
+    # runners. We run inside an official archlinux:base-devel container and
+    # repack the .deb that `tauri build --bundles deb` produces into a native
+    # pacman package.
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+      options: --user root
+    steps:
+      - name: Install system dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed \
+            git nodejs npm rust \
+            webkit2gtk-4.1 gtk3 libappindicator-gtk3 librsvg openssl pkgconf \
+            base-devel sudo github-cli
+
+      - name: Create non-root builder user (makepkg refuses to run as root)
+        run: |
+          useradd -m -d /home/builder -s /bin/bash builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - uses: actions/checkout@v4
+
+      - name: Compute build version
+        id: ver
+        shell: bash
+        run: |
+          # Same logic as the main matrix; additionally derive an Arch-safe
+          # pkgver (makepkg forbids '-' in pkgver, so 0.1.0-rc.1 → 0.1.0rc.1).
+          input_ver="${{ inputs.version }}"
+          if [ -n "$input_ver" ]; then
+            version="$input_ver"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(grep -m1 '^version' src-tauri/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          fi
+          archver="${version//-/}"
+          echo "version=${version}"     >> "$GITHUB_OUTPUT"
+          echo "archver=${archver}"     >> "$GITHUB_OUTPUT"
+
+      - name: Build frontend and tauri .deb bundle
+        shell: bash
+        env:
+          PROSSH_BUILD_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euxo pipefail
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          # Single-quoted bash -c keeps the outer shell from expanding
+          # $GITHUB_WORKSPACE and $PROSSH_BUILD_VERSION — sudo with
+          # --preserve-env hands them through, and the inner bash does
+          # the expansion.
+          sudo -u builder \
+            --preserve-env=GITHUB_WORKSPACE,PROSSH_BUILD_VERSION \
+            bash -c '
+              set -euxo pipefail
+              cd "$GITHUB_WORKSPACE"
+              npm ci
+              # tauri build invokes beforeBuildCommand ("npm run build") itself
+              npx tauri build --bundles deb
+            '
+
+      - name: Repack .deb → Arch .pkg.tar.zst
+        shell: bash
+        run: |
+          set -euxo pipefail
+          install -d -o builder -g builder /home/builder/pkg
+          cp packaging/arch/PKGBUILD /home/builder/pkg/
+          cp LICENSE /home/builder/pkg/
+          find src-tauri/target/release/bundle/deb -name 'ProSSH_*.deb' \
+            -exec cp {} /home/builder/pkg/ \;
+          chown -R builder:builder /home/builder/pkg
+          sudo -u builder bash -c "
+            set -euxo pipefail
+            cd /home/builder/pkg
+            PROSSH_VERSION='${{ steps.ver.outputs.archver }}' makepkg -f --nodeps
+            ls -la *.pkg.tar.zst
+          "
+
+      - name: Upload .pkg.tar.zst to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" /home/builder/pkg/*.pkg.tar.zst \
+            --repo "${GITHUB_REPOSITORY}" --clobber
