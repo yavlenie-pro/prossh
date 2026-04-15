@@ -373,9 +373,8 @@ fn collect_secrets(sessions: &[SessionRow]) -> Result<Vec<SecretRow>, AppError> 
     let mut out = Vec::new();
     for s in sessions {
         let key = crate::sessions::secret_key(&s.id);
-        match secrets::get(&key)? {
-            Some(value) => out.push(SecretRow { key, value }),
-            None => {}
+        if let Some(value) = secrets::get(&key)? {
+            out.push(SecretRow { key, value });
         }
     }
     Ok(out)

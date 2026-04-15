@@ -43,6 +43,10 @@ pub enum BackendKind {
 }
 
 impl BackendKind {
+    // Keeping the `from_str` name (not the `FromStr` trait) so callers can
+    // consume `Option<Self>` directly instead of unwrapping a Result with a
+    // synthesized error type.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "auto" => Some(Self::Auto),

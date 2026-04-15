@@ -42,6 +42,7 @@ fn debug_log(msg: &str) {
 /// zbus looks up the session bus in this order:
 ///   1. `DBUS_SESSION_BUS_ADDRESS` env var
 ///   2. `$XDG_RUNTIME_DIR/bus`
+///
 /// If neither is set, zbus falls back to X11 autolaunch, which Arch (and
 /// many other distros) disable at dbus build time — the user gets a
 /// cryptic `Platform secure storage failure: DBus error: Using X11 for
