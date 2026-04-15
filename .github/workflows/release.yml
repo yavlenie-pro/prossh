@@ -73,6 +73,10 @@ jobs:
 
       - run: npm ci
 
+      - name: Sync bundle version
+        shell: bash
+        run: node scripts/set-version.mjs "${{ steps.ver.outputs.version }}"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Install the matrix entry's cross-compilation target (Apple Silicon
@@ -158,6 +162,10 @@ jobs:
           archver="${version//-/}"
           echo "version=${version}"     >> "$GITHUB_OUTPUT"
           echo "archver=${archver}"     >> "$GITHUB_OUTPUT"
+
+      - name: Sync bundle version
+        shell: bash
+        run: node scripts/set-version.mjs "${{ steps.ver.outputs.version }}"
 
       - name: Build frontend and tauri .deb bundle
         shell: bash
