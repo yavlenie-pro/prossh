@@ -755,17 +755,24 @@ async fn run_auto_sync_once(
         }
     };
 
-    // Pull first so we apply remote changes before clobbering them.
+    // Pull first so we apply remote changes before clobbering them. If pull
+    // fails for any reason other than NotFound we MUST skip the push — the
+    // remote file is real, we just couldn't read it, and pushing would
+    // overwrite another device's data with our (possibly stale or empty)
+    // local snapshot. NotFound is the first-device case where a push is
+    // appropriate (it'll create the file).
     match pull(conn_mutex.clone(), pass.clone()).await {
         Ok(stats) => {
             tracing::info!(?stats, "auto-sync pull ok");
             let _ = app.emit(EVT_AUTO_PULLED, &stats);
         }
+        Err(AppError::NotFound(_)) => {
+            tracing::debug!("auto-sync: remote file missing — push will create it");
+        }
         Err(e) => {
-            tracing::warn!(error = %e, "auto-sync pull failed");
+            tracing::warn!(error = %e, "auto-sync pull failed — skipping push");
             let _ = app.emit(EVT_AUTO_ERROR, format!("pull: {e}"));
-            // Don't return — push may still succeed (e.g. file doesn't
-            // exist on Drive yet).
+            return;
         }
     }
 

@@ -1096,6 +1096,21 @@ function extractMessage(e: unknown): string {
   return JSON.stringify(e);
 }
 
+/**
+ * `AppError` is serialised as `{ kind, message }` (see src-tauri/src/error.rs).
+ * Setup flow uses this to distinguish "remote file doesn't exist yet" — the
+ * expected case on the very first device — from any other pull failure that
+ * must abort before we risk clobbering the remote.
+ */
+function isNotFoundError(e: unknown): boolean {
+  return (
+    !!e &&
+    typeof e === "object" &&
+    "kind" in e &&
+    (e as { kind: unknown }).kind === "not_found"
+  );
+}
+
 // ---------------------------------------------------------------- sync panel
 
 function SyncPanel() {
@@ -1298,19 +1313,31 @@ function SyncPanel() {
       setPendingFilePath(null);
       await refresh();
     } else if (dialogMode === "setup") {
-      // Cache the passphrase (also kicks off the auto-sync loop), then do
-      // the very first push so the encrypted file lands on Drive right
-      // away — otherwise the user would have to wait one auto-tick to
-      // know everything works.
+      // Cache the passphrase (also kicks off the auto-sync loop).
       const next = await syncApi.passphraseSet(passphrase, options.remember ?? true);
       setStatus(next);
       try {
+        // Pull FIRST. If another device has already pushed a vault to Drive
+        // (this device is the second/third/...), we must merge the remote
+        // state in before uploading our own snapshot — otherwise the push
+        // would silently overwrite the remote file with whatever's locally
+        // here (typically empty on a fresh device). `NotFound` is the
+        // expected case on the very first device, so we swallow it and
+        // fall through to the push. Any other pull failure (wrong
+        // passphrase, network, decrypt) must abort setup so we don't
+        // clobber data we couldn't read.
+        try {
+          const stats = await syncApi.pull(passphrase);
+          setLastStats(stats);
+        } catch (e) {
+          if (!isNotFoundError(e)) throw e;
+        }
         const after = await syncApi.push(passphrase);
         setStatus(after);
       } catch (e) {
-        // Push failures are not fatal for setup — passphrase is already
-        // cached, the next auto-tick (or manual push) will retry. Surface
-        // the error inline rather than re-throwing so the dialog closes.
+        // Passphrase is already cached — the next auto-tick (or a manual
+        // push/pull) will retry. Surface the error inline rather than
+        // re-throwing so the dialog closes.
         setError(extractMessage(e));
       }
     }

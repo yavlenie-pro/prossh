@@ -23,12 +23,20 @@
 //!
 //! ## Merge strategy on pull
 //!
-//! We use `INSERT OR REPLACE` keyed by primary id. This gives "remote wins"
-//! semantics, which matches user expectation — if you push on laptop A and
-//! pull on laptop B, laptop B should now look like laptop A did at push time.
+//! Row-level last-write-wins keyed by primary id:
+//!
+//! - New id → insert.
+//! - Existing id with `excluded.updated_at >= local.updated_at` → overwrite.
+//! - Existing id with an older remote → keep the local row untouched.
+//!
+//! That handles the "two devices edit the same session" case without a
+//! vector clock: whoever saved last wins, symmetrically on both devices.
 //! Entities that exist locally but not in the snapshot are left alone; we
-//! don't try to detect deletions because without a vector clock you can't
-//! tell "deleted there" from "created here".
+//! don't try to detect deletions because without tombstones you can't tell
+//! "deleted there" from "created here".
+//!
+//! `created_at` is INSERT-only — once a row exists locally we never touch
+//! its birth date, even when a merge overwrites everything else.
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -401,23 +409,36 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
         .map_err(|e| AppError::Database(format!("begin apply tx: {e}")))?;
 
     // Groups first — sessions FK them; port_forwards & secrets FK sessions.
+    //
+    // Every `ON CONFLICT DO UPDATE` is gated on
+    // `excluded.updated_at >= <table>.updated_at` so an older remote row
+    // can't clobber fresher local edits. Timestamps are RFC3339 strings —
+    // lexicographic comparison matches chronological order as long as all
+    // writers produce the same format (they do, `chrono::Utc::now().to_rfc3339()`).
+    //
+    // `tx.execute` returns the number of rows the statement actually
+    // touched: 1 for a fresh insert, 1 for an UPDATE that ran, and 0 when
+    // the conflict was resolved by the WHERE clause (remote was older).
+    // We accumulate that into `stats` so the "merged N rows" toast reflects
+    // real changes, not just payload size.
     for g in &snap.groups {
-        tx.execute(
+        let n = tx.execute(
             "INSERT INTO groups (id, name, parent_id, sort_order, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(id) DO UPDATE SET
                  name=excluded.name,
                  parent_id=excluded.parent_id,
                  sort_order=excluded.sort_order,
-                 updated_at=excluded.updated_at",
+                 updated_at=excluded.updated_at
+             WHERE excluded.updated_at >= groups.updated_at",
             params![g.id, g.name, g.parent_id, g.sort_order, g.created_at, g.updated_at],
         )
         .map_err(|e| AppError::Database(format!("apply group {}: {e}", g.id)))?;
-        stats.groups += 1;
+        stats.groups += n as u32;
     }
 
     for s in &snap.sessions {
-        tx.execute(
+        let n = tx.execute(
             "INSERT INTO sessions (
                 id, group_id, name, host, port, username, auth_method,
                 private_key_path, use_keychain, description, color, os_type,
@@ -440,7 +461,8 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
                  color=excluded.color,
                  os_type=excluded.os_type,
                  last_used_at=excluded.last_used_at,
-                 updated_at=excluded.updated_at",
+                 updated_at=excluded.updated_at
+             WHERE excluded.updated_at >= sessions.updated_at",
             params![
                 s.id, s.group_id, s.name, s.host, s.port, s.username, s.auth_method,
                 s.private_key_path, s.use_keychain, s.description, s.color, s.os_type,
@@ -448,11 +470,11 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
             ],
         )
         .map_err(|e| AppError::Database(format!("apply session {}: {e}", s.id)))?;
-        stats.sessions += 1;
+        stats.sessions += n as u32;
     }
 
     for pf in &snap.port_forwards {
-        tx.execute(
+        let n = tx.execute(
             "INSERT INTO port_forwards (
                 id, session_id, forward_type, label,
                 bind_host, bind_port, target_host, target_port,
@@ -467,7 +489,8 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
                  target_host=excluded.target_host,
                  target_port=excluded.target_port,
                  enabled=excluded.enabled,
-                 updated_at=excluded.updated_at",
+                 updated_at=excluded.updated_at
+             WHERE excluded.updated_at >= port_forwards.updated_at",
             params![
                 pf.id, pf.session_id, pf.forward_type, pf.label,
                 pf.bind_host, pf.bind_port, pf.target_host, pf.target_port,
@@ -475,11 +498,11 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
             ],
         )
         .map_err(|e| AppError::Database(format!("apply port_forward {}: {e}", pf.id)))?;
-        stats.port_forwards += 1;
+        stats.port_forwards += n as u32;
     }
 
     for cp in &snap.color_profiles {
-        tx.execute(
+        let n = tx.execute(
             "INSERT INTO color_profiles (
                 id, name, is_builtin,
                 foreground, background, cursor, selection,
@@ -505,7 +528,8 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
                  bright_green=excluded.bright_green, bright_yellow=excluded.bright_yellow,
                  bright_blue=excluded.bright_blue, bright_magenta=excluded.bright_magenta,
                  bright_cyan=excluded.bright_cyan, bright_white=excluded.bright_white,
-                 updated_at=excluded.updated_at",
+                 updated_at=excluded.updated_at
+             WHERE excluded.updated_at >= color_profiles.updated_at",
             params![
                 cp.id, cp.name,
                 cp.foreground, cp.background, cp.cursor, cp.selection,
@@ -516,11 +540,11 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
             ],
         )
         .map_err(|e| AppError::Database(format!("apply color_profile {}: {e}", cp.id)))?;
-        stats.color_profiles += 1;
+        stats.color_profiles += n as u32;
     }
 
     for sc in &snap.scripts {
-        tx.execute(
+        let n = tx.execute(
             "INSERT INTO scripts (id, session_id, name, command, sort_order, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT(id) DO UPDATE SET
@@ -528,14 +552,15 @@ pub fn apply(conn: &mut Connection, snap: Snapshot) -> Result<ApplyStats, AppErr
                  name=excluded.name,
                  command=excluded.command,
                  sort_order=excluded.sort_order,
-                 updated_at=excluded.updated_at",
+                 updated_at=excluded.updated_at
+             WHERE excluded.updated_at >= scripts.updated_at",
             params![
                 sc.id, sc.session_id, sc.name, sc.command, sc.sort_order,
                 sc.created_at, sc.updated_at,
             ],
         )
         .map_err(|e| AppError::Database(format!("apply script {}: {e}", sc.id)))?;
-        stats.scripts += 1;
+        stats.scripts += n as u32;
     }
 
     tx.commit()

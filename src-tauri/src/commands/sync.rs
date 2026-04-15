@@ -246,12 +246,21 @@ pub async fn sync_auto_run_now(
     let conn = state.db.conn.clone();
     let runtime = state.sync_runtime.clone();
 
-    // Pull then push — same order as the timed loop. Surface the first
-    // error so the user sees it; if pull errors with NotFound (no remote
-    // file yet) we still try push.
-    let pull_res = sync::pull(conn.clone(), pass.clone()).await;
-    if let Err(ref e) = pull_res {
-        tracing::warn!(error = %e, "manual sync pull failed");
+    // Pull then push — same order as the timed loop. If pull fails for any
+    // reason other than NotFound (wrong passphrase, network, decrypt, …) we
+    // must NOT push: the remote file is real, we just couldn't read it, so
+    // overwriting it with our local state would clobber data another device
+    // uploaded. NotFound is the one case where the remote genuinely doesn't
+    // exist yet and a push is appropriate (first device seeding the vault).
+    match sync::pull(conn.clone(), pass.clone()).await {
+        Ok(_) => {}
+        Err(AppError::NotFound(_)) => {
+            tracing::info!("manual sync: remote file missing — first push will create it");
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "manual sync pull failed — aborting before push");
+            return Err(e);
+        }
     }
     sync::push(conn.clone(), runtime.clone(), pass).await?;
 
