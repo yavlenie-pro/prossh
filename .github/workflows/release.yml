@@ -88,6 +88,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PROSSH_BUILD_VERSION: ${{ steps.ver.outputs.version }}
+          # Google Drive OAuth client baked into release bundles via
+          # option_env! in src-tauri/src/sync/mod.rs. If the secrets are
+          # unset (e.g. on a fork), option_env! resolves to None at compile
+          # time and the build still succeeds — users just have to paste
+          # their own credentials in Settings → Sync → Advanced.
+          PROSSH_GOOGLE_CLIENT_ID: ${{ secrets.PROSSH_GOOGLE_CLIENT_ID }}
+          PROSSH_GOOGLE_CLIENT_SECRET: ${{ secrets.PROSSH_GOOGLE_CLIENT_SECRET }}
           # Apple code signing + notarization. Consumed only by the macOS
           # matrix rows — on Linux/Windows these resolve to empty strings and
           # tauri-action skips signing.
@@ -156,6 +163,10 @@ jobs:
         shell: bash
         env:
           PROSSH_BUILD_VERSION: ${{ steps.ver.outputs.version }}
+          # Same Google OAuth creds as the main matrix — option_env! reads
+          # them at cargo compile time to embed into the binary.
+          PROSSH_GOOGLE_CLIENT_ID: ${{ secrets.PROSSH_GOOGLE_CLIENT_ID }}
+          PROSSH_GOOGLE_CLIENT_SECRET: ${{ secrets.PROSSH_GOOGLE_CLIENT_SECRET }}
         run: |
           set -euxo pipefail
           chown -R builder:builder "$GITHUB_WORKSPACE"
@@ -164,7 +175,7 @@ jobs:
           # --preserve-env hands them through, and the inner bash does
           # the expansion.
           sudo -u builder \
-            --preserve-env=GITHUB_WORKSPACE,PROSSH_BUILD_VERSION \
+            --preserve-env=GITHUB_WORKSPACE,PROSSH_BUILD_VERSION,PROSSH_GOOGLE_CLIENT_ID,PROSSH_GOOGLE_CLIENT_SECRET \
             bash -c '
               set -euxo pipefail
               cd "$GITHUB_WORKSPACE"
