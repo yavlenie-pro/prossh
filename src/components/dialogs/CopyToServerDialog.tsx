@@ -37,6 +37,7 @@ import { useTranslation } from "react-i18next";
 import type { RemoteEntry } from "@/api/sftp";
 import { sftpApi } from "@/api/sftp";
 import type { Session } from "@/api/types";
+import { DraggableDialogContent } from "@/components/ui/DraggableDialogContent";
 import { cn } from "@/lib/cn";
 import { useSessionsStore } from "@/stores/sessions";
 import { useTransfersStore } from "@/stores/transfers";
@@ -627,7 +628,7 @@ export function CopyToServerDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex h-[min(560px,85vh)] w-[min(520px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-bg-elevated shadow-2xl focus:outline-none">
+        <DraggableDialogContent className="fixed left-1/2 top-1/2 z-50 flex h-[min(560px,85vh)] w-[min(520px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-bg-elevated shadow-2xl focus:outline-none">
           <Dialog.Title className="sr-only">{t("files.copyToServerTitle")}</Dialog.Title>
           <Dialog.Description className="sr-only">{t("files.copyToServerTitle")}</Dialog.Description>
 
@@ -1023,7 +1024,7 @@ export function CopyToServerDialog({
               </div>
             </>
           )}
-        </Dialog.Content>
+        </DraggableDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

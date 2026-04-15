@@ -12,6 +12,7 @@ import type { AuthMethod, Group, PortForward, PortForwardInput, PortForwardType,
 import { ScriptEditorDialog } from "@/components/dialogs/ScriptEditorDialog";
 import type { ScriptEditorData } from "@/components/dialogs/ScriptEditorDialog";
 import { Button } from "@/components/ui/Button";
+import { DraggableDialogContent } from "@/components/ui/DraggableDialogContent";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
@@ -325,7 +326,7 @@ export function ConnectionDialog({ open, onOpenChange, session }: Props) {
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[480px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl focus:outline-none">
+        <DraggableDialogContent className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[480px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl focus:outline-none">
           <div className="flex items-center justify-between border-b border-border-subtle px-5 py-3">
             <Dialog.Title className="text-sm font-medium text-fg">
               {session ? t("dialog.editSession") : t("dialog.newSession")}
@@ -719,7 +720,7 @@ export function ConnectionDialog({ open, onOpenChange, session }: Props) {
               </Button>
             </div>
           </form>
-        </Dialog.Content>
+        </DraggableDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

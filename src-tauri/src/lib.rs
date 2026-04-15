@@ -20,6 +20,7 @@ pub mod sessions;
 pub mod sftp;
 pub mod ssh;
 pub mod state;
+pub mod sync;
 pub mod themes;
 
 use state::AppState;
@@ -249,6 +250,23 @@ pub fn run() {
                 });
             }
 
+            // If the user previously opted into "Remember on this device",
+            // pick the master passphrase out of the secret backend and spawn
+            // the auto-sync loop with the cached interval. Failures here are
+            // non-fatal — sync just stays paused until the user re-enters
+            // their passphrase in Settings → Sync.
+            if let Some(pass) = crate::sync::restore_passphrase() {
+                state.sync_runtime.set_passphrase(pass);
+            }
+            {
+                let conn = state.db.conn.clone();
+                let runtime = state.sync_runtime.clone();
+                let app_handle = app.handle().clone();
+                if let Err(e) = crate::sync::start_auto_sync(conn, runtime, app_handle) {
+                    tracing::warn!(error = %e, "failed to start auto-sync at boot");
+                }
+            }
+
             app.manage(state);
             Ok(())
         })
@@ -270,6 +288,13 @@ pub fn run() {
             commands::secrets::secrets_has,
             commands::secrets::secrets_clear,
             commands::secrets::secrets_copy,
+            commands::secrets::secrets_backend_status,
+            commands::secrets::secrets_set_backend,
+            commands::secrets::secrets_vault_create,
+            commands::secrets::secrets_vault_unlock,
+            commands::secrets::secrets_vault_lock,
+            commands::secrets::secrets_vault_change_password,
+            commands::secrets::secrets_vault_destroy,
             commands::known_hosts::known_hosts_list,
             commands::known_hosts::known_hosts_remove,
             commands::known_hosts::known_hosts_clear_host,
@@ -322,6 +347,19 @@ pub fn run() {
             commands::sessions::port_forwards_list,
             commands::sessions::port_forwards_upsert,
             commands::sessions::port_forwards_delete,
+            commands::sync::sync_status,
+            commands::sync::sync_config_get,
+            commands::sync::sync_config_set,
+            commands::sync::sync_oauth_connect,
+            commands::sync::sync_oauth_disconnect,
+            commands::sync::sync_push,
+            commands::sync::sync_pull,
+            commands::sync::sync_export_file,
+            commands::sync::sync_import_file,
+            commands::sync::sync_passphrase_set,
+            commands::sync::sync_passphrase_clear,
+            commands::sync::sync_auto_interval_set,
+            commands::sync::sync_auto_run_now,
         ])
         .build(tauri::generate_context!())
         .expect("error while building prossh")

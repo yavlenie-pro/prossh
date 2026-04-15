@@ -45,11 +45,19 @@ export function TitleBar() {
   const hasTabs = useTabsStore((s) => s.tabs.length > 0);
 
   return (
-    <div className="titlebar-drag flex h-9 shrink-0 select-none items-stretch border-b border-border-subtle bg-bg">
+    <div
+      data-tauri-drag-region
+      className="titlebar-drag flex h-9 shrink-0 select-none items-stretch border-b border-border-subtle bg-bg"
+    >
       {/* App identity */}
-      <div className="titlebar-drag flex items-center gap-2 pl-3 pr-3">
-        <AppLogo size={16} className="text-accent" />
-        <span className="font-mono text-xs text-fg-muted">{t("app.name")}</span>
+      <div
+        data-tauri-drag-region
+        className="titlebar-drag flex items-center gap-2 pl-3 pr-3"
+      >
+        <AppLogo size={16} className="pointer-events-none text-accent" />
+        <span className="pointer-events-none font-mono text-xs text-fg-muted">
+          {t("app.name")}
+        </span>
       </div>
 
       {/* Tabs — fill the middle. When there are no tabs the remaining space
@@ -57,7 +65,7 @@ export function TitleBar() {
       {hasTabs ? (
         <TabBar />
       ) : (
-        <div className="titlebar-drag flex-1" />
+        <div data-tauri-drag-region className="titlebar-drag flex-1" />
       )}
 
       {/* Window controls */}

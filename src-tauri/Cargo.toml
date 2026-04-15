@@ -64,6 +64,24 @@ keyring = { version = "3", features = [
     "crypto-rust",
 ] }
 
+# --- Encrypted file-based secret vault (fallback when OS keyring is unavailable) ---
+# Argon2id KDF + AES-256-GCM. All pure-Rust, no system crypto deps.
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
+
+# --- Google Drive cloud sync ---
+# HTTPS client for Drive REST + token endpoint. rustls-tls keeps us off
+# OpenSSL — same motivation as the russh feature selection.
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+    "json",
+    "stream",
+    "multipart",
+] }
+url = "2"
+
 # --- SSH core (step 5) ---
 # russh is a pure-Rust SSH implementation. We deliberately disable the default
 # `aws-lc-rs` crypto backend because `aws-lc-sys` requires NASM to build on

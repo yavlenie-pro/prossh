@@ -44,3 +44,6 @@ Cargo.lock.user
 # OS
 Thumbs.db
 ehthumbs.db
+
+# Claude Code / agent session data
+.claude/

@@ -7,6 +7,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { DraggableDialogContent } from "@/components/ui/DraggableDialogContent";
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 export interface ScriptEditorData {
@@ -158,7 +160,7 @@ export function ScriptEditorDialog({ open, onOpenChange, initial, onSave }: Prop
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[560px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border-subtle bg-bg-elevated shadow-2xl data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95">
+        <DraggableDialogContent className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[560px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border-subtle bg-bg-elevated shadow-2xl data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border-subtle px-5 py-3">
             <Dialog.Title className="text-sm font-semibold text-fg">
@@ -244,7 +246,7 @@ export function ScriptEditorDialog({ open, onOpenChange, initial, onSave }: Prop
               {t("dialog.save")}
             </button>
           </div>
-        </Dialog.Content>
+        </DraggableDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

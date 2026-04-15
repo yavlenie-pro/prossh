@@ -13,4 +13,5 @@ pub mod settings;
 pub mod sftp;
 pub mod ssh;
 pub mod scripts;
+pub mod sync;
 pub mod system;

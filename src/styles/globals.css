@@ -52,12 +52,12 @@ body {
   background: rgb(var(--prossh-fg-subtle));
 }
 
-/* Drag region for the custom titlebar */
-.titlebar-drag {
-  -webkit-app-region: drag;
-  app-region: drag;
-}
+/* Drag region for the custom titlebar.
+   NOTE: `-webkit-app-region` is an Electron-only API; Tauri's WebView does not
+   recognise it. Window dragging is controlled via the `data-tauri-drag-region`
+   HTML attribute instead (see TitleBar.tsx / TabBar.tsx). The classes below
+   remain as semantic markers only — they do not produce drag behaviour. */
+.titlebar-drag,
 .titlebar-no-drag {
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
+  /* intentionally empty */
 }

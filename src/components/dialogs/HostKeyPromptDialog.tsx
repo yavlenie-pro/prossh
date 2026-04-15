@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { ptyApi } from "@/api/pty";
 import { Button } from "@/components/ui/Button";
+import { DraggableDialogContent } from "@/components/ui/DraggableDialogContent";
 
 interface Props {
   promptId: string;
@@ -47,7 +48,7 @@ export function HostKeyPromptDialog({
     <Dialog.Root open onOpenChange={(open) => { if (!open) void respond(false); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border-subtle bg-bg-elevated p-6 shadow-xl">
+        <DraggableDialogContent className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border-subtle bg-bg-elevated p-6 shadow-xl">
           <Dialog.Title className="flex items-center gap-2 text-base font-semibold text-fg">
             <ShieldQuestion className="h-5 w-5 text-warning" />
             {t("hostKey.title")}
@@ -104,7 +105,7 @@ export function HostKeyPromptDialog({
               <X className="h-4 w-4" />
             </button>
           </Dialog.Close>
-        </Dialog.Content>
+        </DraggableDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

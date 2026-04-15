@@ -22,6 +22,7 @@ use crate::known_hosts::KnownHostsStore;
 use crate::sftp::SftpMap;
 use crate::ssh::gate::PromptMap;
 use crate::ssh::pty::SessionMap;
+use crate::sync::SyncRuntime;
 
 /// Active transfer cancellation tokens keyed by `transfer_id`.
 pub type TransferCancellations = Arc<RwLock<HashMap<String, CancellationToken>>>;
@@ -62,6 +63,11 @@ impl AppPaths {
     pub fn known_hosts_path(&self) -> PathBuf {
         self.config_dir.join("known_hosts.json")
     }
+
+    /// Encrypted secret vault used when the OS keyring isn't available.
+    pub fn secrets_vault_path(&self) -> PathBuf {
+        self.data_dir.join("secrets.vault")
+    }
 }
 
 /// Top-level state managed by Tauri (`app.manage(state)`).
@@ -83,12 +89,38 @@ pub struct AppState {
     pub sftp_sessions: SftpMap,
     /// Active transfer cancellation tokens keyed by `transfer_id`.
     pub transfer_cancellations: TransferCancellations,
+    /// Cached sync passphrase + handle of the auto-sync background task.
+    /// Outlives individual commands so the loop can encrypt without
+    /// re-prompting on every tick.
+    pub sync_runtime: Arc<SyncRuntime>,
 }
 
 impl AppState {
     pub fn new(_app: &AppHandle) -> Result<Self, AppError> {
         let paths = AppPaths::resolve()?;
         let db = Database::open(&paths.database_path())?;
+
+        // Initialise the global secret manager as soon as we know where the
+        // vault file lives and which backend the user selected last time.
+        // Reading from `settings` here means the SQLite connection has to
+        // be open first — hence the ordering.
+        {
+            use rusqlite::OptionalExtension;
+            let backend = {
+                let conn = db.conn.lock();
+                conn.query_row(
+                    "SELECT value FROM settings WHERE key = 'secrets.backend'",
+                    [],
+                    |r| r.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|e| AppError::Database(format!("read secrets.backend: {e}")))?
+                .and_then(|v| crate::secrets::BackendKind::from_str(&v))
+                .unwrap_or(crate::secrets::BackendKind::Auto)
+            };
+            crate::secrets::init(paths.secrets_vault_path(), backend);
+        }
+
         let known_hosts = Arc::new(KnownHostsStore::load(&paths.known_hosts_path())?);
         let ssh_sessions = crate::ssh::pty::new_session_map();
         let passphrase_gate = crate::ssh::gate::new_prompt_map();
@@ -96,6 +128,7 @@ impl AppState {
         let credentials_gate = crate::ssh::gate::new_prompt_map();
         let sftp_sessions = crate::sftp::new_sftp_map();
         let transfer_cancellations: TransferCancellations = Arc::new(RwLock::new(HashMap::new()));
+        let sync_runtime = SyncRuntime::new();
         tracing::info!(?paths, "app state initialized");
         Ok(Self {
             paths,
@@ -107,6 +140,7 @@ impl AppState {
             credentials_gate,
             sftp_sessions,
             transfer_cancellations,
+            sync_runtime,
         })
     }
 }

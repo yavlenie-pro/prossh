@@ -1,16 +1,28 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Activity, Code2, Copy, Github, Globe, Info, Keyboard, Palette, Pencil, Plus, Search, Server, ShieldCheck, Terminal, Trash2, X } from "lucide-react";
+import { Activity, AlertTriangle, ChevronDown, ChevronRight, Cloud, CloudOff, Code2, Copy, Download, FileDown, FileKey, FileUp, Github, Globe, Info, Key, Keyboard, KeyRound, Lock, LockOpen, Palette, Pencil, Plus, RefreshCw, RotateCcw, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from "lucide-react";
+import { open as openFileDialog, save as saveFileDialog } from "@tauri-apps/plugin-dialog";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
 
 import type { ColorProfile, Session } from "@/api/types";
 import { settingsApi } from "@/api/settings";
+import type { BackendStatus, SecretBackendKind } from "@/api/secrets";
+import { secretsApi } from "@/api/secrets";
+import type { ApplyStats, SyncStatus } from "@/api/sync";
+import { syncApi } from "@/api/sync";
 import type { ScriptInput } from "@/api/scripts";
 import { useScriptsStore } from "@/stores/scripts";
 import { useSessionsStore } from "@/stores/sessions";
 import { setLanguage } from "@/i18n";
 import { KnownHostsPanel } from "@/components/known-hosts/KnownHostsPanel";
 import { ConnectionDialog } from "@/components/dialogs/ConnectionDialog";
+import { VaultPasswordDialog, type VaultPasswordMode } from "@/components/dialogs/VaultPasswordDialog";
+import { SyncPassphraseDialog, type SyncPassphraseMode } from "@/components/dialogs/SyncPassphraseDialog";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Button } from "@/components/ui/Button";
+import { DraggableDialogContent } from "@/components/ui/DraggableDialogContent";
 import { cn } from "@/lib/cn";
 import { useThemeStore } from "@/stores/theme";
 import { ScriptEditorDialog } from "@/components/dialogs/ScriptEditorDialog";
@@ -19,7 +31,7 @@ import brandLogoEn from "@/assets/brand/proyavlenie-en.png";
 import brandLogoRu from "@/assets/brand/proyavlenie-ru.png";
 import { useAppVersion } from "@/hooks/useAppVersion";
 
-type Tab = "sessions" | "known-hosts" | "appearance" | "terminal" | "monitoring" | "scripts" | "language" | "keyboard" | "about";
+type Tab = "sessions" | "known-hosts" | "security" | "sync" | "appearance" | "terminal" | "monitoring" | "scripts" | "language" | "keyboard" | "about";
 
 interface Props {
   open: boolean;
@@ -32,6 +44,8 @@ interface Props {
 const TAB_DEFS: { id: Tab; labelKey: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "sessions", labelKey: "settings.sessions", icon: Server },
   { id: "known-hosts", labelKey: "settings.knownHosts", icon: ShieldCheck },
+  { id: "security", labelKey: "settings.security", icon: Key },
+  { id: "sync", labelKey: "settings.sync", icon: Cloud },
   { id: "appearance", labelKey: "settings.appearance", icon: Palette },
   { id: "terminal", labelKey: "settings.terminal", icon: Terminal },
   { id: "monitoring", labelKey: "settings.monitoring", icon: Activity },
@@ -58,7 +72,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = "sessions" }: 
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex h-[min(640px,85vh)] w-[min(820px,90vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-border bg-bg-elevated shadow-2xl focus:outline-none">
+        <DraggableDialogContent className="fixed left-1/2 top-1/2 z-50 flex h-[min(640px,85vh)] w-[min(820px,90vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-border bg-bg-elevated shadow-2xl focus:outline-none">
           <Dialog.Title className="sr-only">{t("settings.title")}</Dialog.Title>
           <Dialog.Description className="sr-only">
             {t("settings.title")}
@@ -99,6 +113,8 @@ export function SettingsDialog({ open, onOpenChange, initialTab = "sessions" }: 
 
             {tab === "sessions" && <SessionsPanel />}
             {tab === "known-hosts" && <KnownHostsPanel />}
+            {tab === "security" && <SecurityPanel />}
+            {tab === "sync" && <SyncPanel />}
             {tab === "appearance" && <AppearancePanel />}
             {tab === "terminal" && <TerminalPanel />}
             {tab === "monitoring" && <MonitoringPanel />}
@@ -107,7 +123,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = "sessions" }: 
             {tab === "keyboard" && <KeyboardPanel />}
             {tab === "about" && <AboutPanel />}
           </div>
-        </Dialog.Content>
+        </DraggableDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );
@@ -775,6 +791,965 @@ function KeyboardPanel() {
       </div>
     </div>
   );
+}
+
+function SecurityPanel() {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<BackendStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dialogMode, setDialogMode] = useState<VaultPasswordMode | null>(null);
+
+  const refresh = async () => {
+    try {
+      setStatus(await secretsApi.backendStatus());
+    } catch (e) {
+      setError(extractMessage(e));
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const onKindChange = async (kind: SecretBackendKind) => {
+    setError(null);
+    setBusy(true);
+    try {
+      setStatus(await secretsApi.setBackend(kind));
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onLock = async () => {
+    setBusy(true);
+    try {
+      setStatus(await secretsApi.vaultLock());
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDestroy = async () => {
+    if (!confirm(t("security.destroyConfirm"))) return;
+    setBusy(true);
+    try {
+      setStatus(await secretsApi.vaultDestroy());
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDialogSubmit = async (newPw: string, oldPw: string) => {
+    let next: BackendStatus;
+    if (dialogMode === "create") {
+      next = await secretsApi.vaultCreate(newPw);
+    } else if (dialogMode === "unlock") {
+      next = await secretsApi.vaultUnlock(newPw);
+    } else if (dialogMode === "change") {
+      next = await secretsApi.vaultChangePassword(oldPw, newPw);
+    } else {
+      return;
+    }
+    setStatus(next);
+  };
+
+  if (!status) {
+    return (
+      <div className="p-5 text-xs text-fg-muted">{t("security.loading")}</div>
+    );
+  }
+
+  const keyringDisabled = !status.keyringAvailable;
+
+  return (
+    <div className="flex h-full flex-col overflow-y-auto p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-fg">{t("settings.security")}</h3>
+          <p className="mt-1 text-xs text-fg-muted">{t("security.description")}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="rounded p-1 text-fg-subtle hover:bg-bg-overlay hover:text-fg"
+          title={t("security.refresh")}
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {keyringDisabled && (
+        <div className="mt-4 flex items-start gap-2 rounded border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] text-warning">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{t("security.keyringUnavailable")}</span>
+        </div>
+      )}
+
+      <div className="mt-4 space-y-2">
+        <BackendRadio
+          value="auto"
+          current={status.configured}
+          disabled={busy}
+          title={t("security.backendAuto")}
+          subtitle={t("security.backendAutoDesc")}
+          onChange={(v) => void onKindChange(v)}
+        />
+        <BackendRadio
+          value="keyring"
+          current={status.configured}
+          disabled={busy || keyringDisabled}
+          title={t("security.backendKeyring")}
+          subtitle={
+            keyringDisabled
+              ? t("security.backendKeyringUnavailableDesc")
+              : t("security.backendKeyringDesc")
+          }
+          onChange={(v) => void onKindChange(v)}
+        />
+        <BackendRadio
+          value="file"
+          current={status.configured}
+          disabled={busy}
+          title={t("security.backendFile")}
+          subtitle={t("security.backendFileDesc")}
+          onChange={(v) => void onKindChange(v)}
+        />
+      </div>
+
+      <div className="mt-5 rounded-lg border border-border-subtle bg-bg-overlay/40 p-4">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">
+          {t("security.status")}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-fg">
+          {status.effective === "file" ? (
+            status.fileUnlocked ? (
+              <>
+                <LockOpen className="h-4 w-4 text-accent" />
+                <span>{t("security.fileUnlocked")}</span>
+              </>
+            ) : status.fileExists ? (
+              <>
+                <Lock className="h-4 w-4 text-warning" />
+                <span>{t("security.fileLocked")}</span>
+              </>
+            ) : (
+              <>
+                <Lock className="h-4 w-4 text-fg-subtle" />
+                <span>{t("security.fileMissing")}</span>
+              </>
+            )
+          ) : (
+            <>
+              <ShieldCheck className="h-4 w-4 text-accent" />
+              <span>{t("security.keyringActive")}</span>
+            </>
+          )}
+        </div>
+
+        {status.effective === "file" && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {!status.fileExists && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setError(null);
+                  setDialogMode("create");
+                }}
+                disabled={busy}
+              >
+                {t("security.actionCreate")}
+              </Button>
+            )}
+            {status.fileExists && !status.fileUnlocked && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setError(null);
+                  setDialogMode("unlock");
+                }}
+                disabled={busy}
+              >
+                {t("security.actionUnlock")}
+              </Button>
+            )}
+            {status.fileExists && status.fileUnlocked && (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void onLock()}
+                  disabled={busy}
+                >
+                  {t("security.actionLock")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setError(null);
+                    setDialogMode("change");
+                  }}
+                  disabled={busy}
+                >
+                  {t("security.actionChange")}
+                </Button>
+              </>
+            )}
+            {status.fileExists && (
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={() => void onDestroy()}
+                disabled={busy}
+              >
+                {t("security.actionDestroy")}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="mt-3 flex items-start gap-2 rounded border border-danger/30 bg-danger/10 px-3 py-2 text-[11px] text-danger">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {dialogMode !== null && (
+        <VaultPasswordDialog
+          open
+          mode={dialogMode}
+          onOpenChange={(o) => {
+            if (!o) setDialogMode(null);
+          }}
+          onSubmit={handleDialogSubmit}
+        />
+      )}
+    </div>
+  );
+}
+
+function BackendRadio({
+  value,
+  current,
+  disabled,
+  title,
+  subtitle,
+  onChange,
+}: {
+  value: SecretBackendKind;
+  current: SecretBackendKind;
+  disabled?: boolean;
+  title: string;
+  subtitle: string;
+  onChange: (v: SecretBackendKind) => void;
+}) {
+  const active = value === current;
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition-colors",
+        active
+          ? "border-accent bg-accent/10"
+          : "border-border-subtle hover:border-fg-subtle",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      <input
+        type="radio"
+        name="secret-backend"
+        value={value}
+        checked={active}
+        disabled={disabled}
+        onChange={() => onChange(value)}
+        className="mt-0.5 h-3.5 w-3.5 accent-accent"
+      />
+      <div className="flex-1">
+        <div className="text-xs font-medium text-fg">{title}</div>
+        <div className="mt-0.5 text-[11px] text-fg-muted">{subtitle}</div>
+      </div>
+    </label>
+  );
+}
+
+function extractMessage(e: unknown): string {
+  if (e && typeof e === "object" && "message" in e) {
+    return String((e as { message: unknown }).message);
+  }
+  if (typeof e === "string") return e;
+  return JSON.stringify(e);
+}
+
+// ---------------------------------------------------------------- sync panel
+
+function SyncPanel() {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<SyncStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Local form state. Mirrors `status.config` but lets the user edit
+  // client_id / filename without rerendering everything on each keystroke.
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  // undefined = user hasn't touched the field (preserves existing secret);
+  // "" = explicit clear. Done with a string+dirty flag so the user can
+  // type and see the input update.
+  const [secretDirty, setSecretDirty] = useState(false);
+  const [filename, setFilename] = useState("");
+  const [dialogMode, setDialogMode] = useState<SyncPassphraseMode | null>(null);
+  const [lastStats, setLastStats] = useState<ApplyStats | null>(null);
+  // When a push/pull dialog is open we also need to know where to send the
+  // passphrase. For file modes, it's the path the user just picked.
+  const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
+  // Collapsed by default when embedded creds are available — most users
+  // never open this section.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const refresh = async () => {
+    try {
+      const s = await syncApi.status();
+      setStatus(s);
+      setClientId(s.config.clientId);
+      setFilename(s.config.filename);
+      setClientSecret("");
+      setSecretDirty(false);
+    } catch (e) {
+      setError(extractMessage(e));
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  // Surface auto-sync activity from the backend loop. We re-fetch status
+  // (cheap; lots of useful state changes) and stash the last event for a
+  // small inline hint so the user knows the loop is alive.
+  const [autoEvent, setAutoEvent] = useState<{
+    kind: "ok" | "error" | "skip";
+    text: string;
+    at: number;
+  } | null>(null);
+  useEffect(() => {
+    const subs: Promise<UnlistenFn>[] = [
+      listen<ApplyStats>("sync-auto-pulled", () => {
+        setAutoEvent({ kind: "ok", text: t("sync.autoEventPulled"), at: Date.now() });
+        void refresh();
+      }),
+      listen<void>("sync-auto-pushed", () => {
+        setAutoEvent({ kind: "ok", text: t("sync.autoEventPushed"), at: Date.now() });
+        void refresh();
+      }),
+      listen<string>("sync-auto-error", (e) => {
+        setAutoEvent({ kind: "error", text: e.payload, at: Date.now() });
+      }),
+      listen<string>("sync-auto-skipped", (e) => {
+        setAutoEvent({ kind: "skip", text: e.payload, at: Date.now() });
+      }),
+    ];
+    return () => {
+      subs.forEach((p) => void p.then((u) => u()));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveConfig = async (nextEnabled?: boolean) => {
+    if (!status) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const next = await syncApi.configSet({
+        clientId: clientId.trim(),
+        clientSecret: secretDirty ? clientSecret : null,
+        filename: filename.trim(),
+        enabled: nextEnabled ?? status.config.enabled,
+      });
+      setStatus(next);
+      setClientSecret("");
+      setSecretDirty(false);
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connect = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      // Persist any edits first — the OAuth flow reads client_id/secret from storage.
+      if (
+        clientId.trim() !== status?.config.clientId ||
+        filename.trim() !== status?.config.filename ||
+        secretDirty
+      ) {
+        await syncApi.configSet({
+          clientId: clientId.trim(),
+          clientSecret: secretDirty ? clientSecret : null,
+          filename: filename.trim(),
+          enabled: status?.config.enabled ?? false,
+        });
+        setClientSecret("");
+        setSecretDirty(false);
+      }
+      const next = await syncApi.oauthConnect();
+      setStatus(next);
+      // Right after a fresh OAuth handshake, prompt for the master
+      // passphrase. Without it auto-sync can't encrypt anything, so we
+      // ask now rather than at the first push attempt.
+      if (next.connected && !next.passphraseCached) {
+        setDialogMode("setup");
+      }
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setAutoInterval = async (minutes: number) => {
+    setError(null);
+    setBusy(true);
+    try {
+      const next = await syncApi.autoIntervalSet(minutes);
+      setStatus(next);
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearPassphrase = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const next = await syncApi.passphraseClear();
+      setStatus(next);
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const syncNow = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const next = await syncApi.autoRunNow();
+      setStatus(next);
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnect = async () => {
+    if (!confirm(t("sync.disconnectConfirm"))) return;
+    setError(null);
+    setBusy(true);
+    try {
+      setStatus(await syncApi.oauthDisconnect());
+    } catch (e) {
+      setError(extractMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDialogSubmit = async (
+    passphrase: string,
+    options: { remember?: boolean },
+  ) => {
+    if (dialogMode === "push") {
+      const next = await syncApi.push(passphrase);
+      setStatus(next);
+      setLastStats(null);
+    } else if (dialogMode === "pull") {
+      const stats = await syncApi.pull(passphrase);
+      setLastStats(stats);
+      await refresh();
+    } else if (dialogMode === "exportFile" && pendingFilePath) {
+      await syncApi.exportFile(passphrase, pendingFilePath);
+      setLastStats(null);
+      setPendingFilePath(null);
+    } else if (dialogMode === "importFile" && pendingFilePath) {
+      const stats = await syncApi.importFile(passphrase, pendingFilePath);
+      setLastStats(stats);
+      setPendingFilePath(null);
+      await refresh();
+    } else if (dialogMode === "setup") {
+      // Cache the passphrase (also kicks off the auto-sync loop), then do
+      // the very first push so the encrypted file lands on Drive right
+      // away — otherwise the user would have to wait one auto-tick to
+      // know everything works.
+      const next = await syncApi.passphraseSet(passphrase, options.remember ?? true);
+      setStatus(next);
+      try {
+        const after = await syncApi.push(passphrase);
+        setStatus(after);
+      } catch (e) {
+        // Push failures are not fatal for setup — passphrase is already
+        // cached, the next auto-tick (or manual push) will retry. Surface
+        // the error inline rather than re-throwing so the dialog closes.
+        setError(extractMessage(e));
+      }
+    }
+  };
+
+  const startExportFile = async () => {
+    setError(null);
+    try {
+      const path = await saveFileDialog({
+        title: t("sync.exportFileDialogTitle"),
+        defaultPath: status?.config.filename || "prossh-sessions.vault",
+        filters: [
+          { name: "ProSSH vault", extensions: ["vault"] },
+          { name: "All files", extensions: ["*"] },
+        ],
+      });
+      if (!path) return;
+      setPendingFilePath(path);
+      setDialogMode("exportFile");
+    } catch (e) {
+      setError(extractMessage(e));
+    }
+  };
+
+  const startImportFile = async () => {
+    setError(null);
+    try {
+      const picked = await openFileDialog({
+        title: t("sync.importFileDialogTitle"),
+        multiple: false,
+        directory: false,
+        filters: [
+          { name: "ProSSH vault", extensions: ["vault"] },
+          { name: "All files", extensions: ["*"] },
+        ],
+      });
+      const path = Array.isArray(picked) ? picked[0] : picked;
+      if (!path) return;
+      setPendingFilePath(path);
+      setDialogMode("importFile");
+    } catch (e) {
+      setError(extractMessage(e));
+    }
+  };
+
+  if (!status) {
+    return <div className="p-5 text-xs text-fg-muted">{t("sync.loading")}</div>;
+  }
+
+  // User can connect to Drive when either (a) embedded default creds are
+  // baked in, or (b) they've provided their own in Advanced. The connect
+  // handler reads user creds first and falls through to embedded in the
+  // backend — so we mirror that rule here for the enable/disable state.
+  const canConnect =
+    status.config.hasEmbeddedCreds ||
+    (clientId.trim().length > 0 &&
+      (status.config.hasClientSecret || (secretDirty && clientSecret.length > 0)));
+  const canSync = status.connected;
+  const hasDirtyConfig =
+    clientId.trim() !== status.config.clientId ||
+    filename.trim() !== status.config.filename ||
+    secretDirty;
+
+  return (
+    <div className="flex h-full flex-col overflow-y-auto p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-fg">{t("settings.sync")}</h3>
+          <p className="mt-1 text-xs text-fg-muted">{t("sync.description")}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="rounded p-1 text-fg-subtle hover:bg-bg-overlay hover:text-fg"
+          title={t("sync.refresh")}
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* File export/import — the zero-setup path. No OAuth, no cloud,
+          user carries the .vault file via whatever transport they like. */}
+      <div className="mt-5 rounded-lg border border-border-subtle bg-bg-overlay/40 p-4">
+        <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">
+          <FileKey className="h-3 w-3" />
+          {t("sync.fileSection")}
+        </div>
+        <p className="mb-3 text-[11px] text-fg-muted">
+          {t("sync.fileSectionDesc")}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => void startExportFile()}
+            disabled={busy}
+          >
+            <FileUp className="mr-1.5 h-3.5 w-3.5" />
+            {t("sync.actionExportFile")}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => void startImportFile()}
+            disabled={busy}
+          >
+            <FileDown className="mr-1.5 h-3.5 w-3.5" />
+            {t("sync.actionImportFile")}
+          </Button>
+        </div>
+      </div>
+
+      {/* Google Drive — the seamless sync path. Credentials / filename live
+          under Advanced; default view is just "Connect" or push/pull. */}
+      <div className="mt-4 rounded-lg border border-border-subtle bg-bg-overlay/40 p-4">
+        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">
+          <Cloud className="h-3 w-3" />
+          {t("sync.driveSection")}
+        </div>
+        <p className="mb-3 text-[11px] text-fg-muted">
+          {t("sync.driveSectionDesc")}
+        </p>
+
+        <div className="flex items-center gap-2 text-xs text-fg">
+          {status.connected ? (
+            <>
+              <Cloud className="h-4 w-4 text-accent" />
+              <div className="flex flex-col">
+                <span className="text-fg">
+                  {status.accountName || status.accountEmail || t("sync.connected")}
+                </span>
+                {status.accountEmail && status.accountName && (
+                  <span className="text-[11px] text-fg-muted">
+                    {status.accountEmail}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <CloudOff className="h-4 w-4 text-fg-subtle" />
+              <span className="text-fg-muted">{t("sync.notConnected")}</span>
+            </>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {!status.connected ? (
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => void connect()}
+              disabled={busy || !canConnect}
+            >
+              {busy ? t("sync.connecting") : t("sync.connect")}
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setError(null);
+                  setDialogMode("push");
+                }}
+                disabled={busy || !canSync}
+              >
+                <Upload className="mr-1.5 h-3.5 w-3.5" />
+                {t("sync.actionPush")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setError(null);
+                  setDialogMode("pull");
+                }}
+                disabled={busy || !canSync}
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                {t("sync.actionPull")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void syncNow()}
+                disabled={busy || !canSync || !status.passphraseCached}
+                title={
+                  !status.passphraseCached ? t("sync.syncNowDisabledHint") : undefined
+                }
+              >
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                {t("sync.actionSyncNow")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void disconnect()}
+                disabled={busy}
+              >
+                {t("sync.disconnect")}
+              </Button>
+            </>
+          )}
+        </div>
+
+        {/* Auto-sync controls. Surface only after a Drive connection is
+            established — without OAuth tokens these knobs do nothing. */}
+        {status.connected && (
+          <div className="mt-4 space-y-2 rounded border border-border-subtle bg-bg/40 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="sync-auto-interval" className="text-[11px] font-medium text-fg">
+                {t("sync.autoIntervalLabel")}
+              </Label>
+              <select
+                id="sync-auto-interval"
+                value={status.config.autoSyncIntervalMin}
+                onChange={(e) => void setAutoInterval(Number(e.target.value))}
+                disabled={busy}
+                className="rounded border border-border-subtle bg-bg-elevated px-2 py-1 text-[11px] text-fg focus:border-accent focus:outline-none"
+              >
+                <option value={0}>{t("sync.autoIntervalOff")}</option>
+                <option value={5}>{t("sync.autoIntervalMinutes", { n: 5 })}</option>
+                <option value={15}>{t("sync.autoIntervalMinutes", { n: 15 })}</option>
+                <option value={30}>{t("sync.autoIntervalMinutes", { n: 30 })}</option>
+                <option value={60}>{t("sync.autoIntervalMinutes", { n: 60 })}</option>
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 text-[11px]">
+              <span className="flex items-center gap-1.5 text-fg-muted">
+                <KeyRound className="h-3 w-3" />
+                {status.passphraseCached ? (
+                  <>
+                    <span className="text-success">{t("sync.passphraseCached")}</span>
+                  </>
+                ) : (
+                  <span className="text-warning">{t("sync.passphraseMissing")}</span>
+                )}
+              </span>
+              {status.passphraseCached ? (
+                <button
+                  type="button"
+                  onClick={() => void clearPassphrase()}
+                  disabled={busy}
+                  className="text-[11px] text-fg-subtle underline-offset-2 hover:text-fg hover:underline disabled:opacity-50"
+                >
+                  {t("sync.passphraseForget")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setDialogMode("setup");
+                  }}
+                  disabled={busy}
+                  className="text-[11px] text-accent underline-offset-2 hover:underline disabled:opacity-50"
+                >
+                  {t("sync.passphraseSetCta")}
+                </button>
+              )}
+            </div>
+
+            {autoEvent && (
+              <div
+                className={cn(
+                  "text-[10px]",
+                  autoEvent.kind === "ok"
+                    ? "text-fg-subtle"
+                    : autoEvent.kind === "error"
+                      ? "text-danger"
+                      : "text-warning",
+                )}
+              >
+                {autoEvent.text} ·{" "}
+                {new Date(autoEvent.at).toLocaleTimeString()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {status.lastSyncedAt && (
+          <div className="mt-3 text-[11px] text-fg-muted">
+            {t("sync.lastSynced", { when: formatTimestamp(status.lastSyncedAt) })}
+          </div>
+        )}
+
+        {/* Advanced — custom OAuth credentials + Drive filename. Hidden by
+            default when embedded creds ship; surfaced when the user has
+            already typed something in or when the build has no defaults. */}
+        <div className="mt-4 border-t border-border-subtle pt-3">
+          <button
+            type="button"
+            className="flex w-full items-center gap-1.5 text-[11px] font-medium text-fg-subtle hover:text-fg"
+            onClick={() => setAdvancedOpen((v) => !v)}
+          >
+            {advancedOpen ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            {t("sync.advanced")}
+            {status.config.hasEmbeddedCreds && !advancedOpen && (
+              <span className="ml-2 text-[10px] text-fg-subtle">
+                {t("sync.embeddedHint")}
+              </span>
+            )}
+          </button>
+
+          {advancedOpen && (
+            <div className="mt-3 space-y-3">
+              <p className="text-[11px] text-fg-muted">
+                {t("sync.credentialsHelp")}
+              </p>
+              <div>
+                <Label htmlFor="sync-client-id">{t("sync.clientId")}</Label>
+                <Input
+                  id="sync-client-id"
+                  type="text"
+                  placeholder={
+                    status.config.hasEmbeddedCreds
+                      ? t("sync.clientIdEmbeddedPlaceholder")
+                      : "1234567890-abc.apps.googleusercontent.com"
+                  }
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              <div>
+                <Label htmlFor="sync-client-secret">
+                  {t("sync.clientSecret")}
+                  {status.config.hasClientSecret && !secretDirty && (
+                    <span className="ml-2 text-[10px] text-fg-subtle">
+                      {t("sync.secretStored")}
+                    </span>
+                  )}
+                </Label>
+                <Input
+                  id="sync-client-secret"
+                  type="password"
+                  placeholder={
+                    status.config.hasClientSecret
+                      ? "••••••••••••••••"
+                      : "GOCSPX-..."
+                  }
+                  value={clientSecret}
+                  onChange={(e) => {
+                    setClientSecret(e.target.value);
+                    setSecretDirty(true);
+                  }}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              <div>
+                <Label htmlFor="sync-filename">{t("sync.filename")}</Label>
+                <Input
+                  id="sync-filename"
+                  type="text"
+                  value={filename}
+                  onChange={(e) => setFilename(e.target.value)}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              {hasDirtyConfig && (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void saveConfig()}
+                    disabled={busy}
+                  >
+                    {t("sync.saveConfig")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {lastStats && (
+        <div className="mt-3 rounded border border-border-subtle bg-bg/60 px-3 py-2 text-[11px] text-fg-muted">
+          {t("sync.pullStats", {
+            sessions: lastStats.sessions,
+            groups: lastStats.groups,
+            portForwards: lastStats.portForwards,
+            colorProfiles: lastStats.colorProfiles,
+            scripts: lastStats.scripts,
+            secrets: lastStats.secrets,
+          })}
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-3 flex items-start gap-2 rounded border border-danger/30 bg-danger/10 px-3 py-2 text-[11px] text-danger">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {dialogMode !== null && (
+        <SyncPassphraseDialog
+          open
+          mode={dialogMode}
+          onOpenChange={(o) => {
+            if (!o) {
+              setDialogMode(null);
+              setPendingFilePath(null);
+            }
+          }}
+          onSubmit={handleDialogSubmit}
+        />
+      )}
+    </div>
+  );
+}
+
+function formatTimestamp(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
 }
 
 function AboutPanel() {

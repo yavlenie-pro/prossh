@@ -25,7 +25,8 @@ export function TabBar() {
   return (
     <div
       role="tablist"
-      className="titlebar-no-drag flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto pl-1 pr-2 pt-1"
+      data-tauri-drag-region
+      className="flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto pl-1 pr-2 pt-1"
     >
       {tabs.map((tab) => (
         <TabButton
