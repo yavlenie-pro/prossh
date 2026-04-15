@@ -37,6 +37,62 @@ fn debug_log(msg: &str) {
     }
 }
 
+/// On Linux, keyring-rs talks to the freedesktop Secret Service over DBus.
+/// zbus looks up the session bus in this order:
+///   1. `DBUS_SESSION_BUS_ADDRESS` env var
+///   2. `$XDG_RUNTIME_DIR/bus`
+/// If neither is set, zbus falls back to X11 autolaunch, which Arch (and
+/// many other distros) disable at dbus build time — the user gets a
+/// cryptic `Platform secure storage failure: DBus error: Using X11 for
+/// dbus-daemon autolaunch was disabled at compile time` error and keyring
+/// is effectively dead.
+///
+/// A surprisingly common Arch setup has those env vars empty in graphical
+/// sessions (manual `startx` from tty, non-systemd init, broken PAM env
+/// propagation, launching via older DMs, …) while `gnome-keyring-daemon`
+/// *is* actually running on `/run/user/<uid>/bus`. Detect that case and
+/// wire up the env vars ourselves before anything tries to use them.
+#[cfg(target_os = "linux")]
+fn hydrate_dbus_env() {
+    use std::path::Path;
+
+    fn current_uid() -> Option<u32> {
+        // /proc/self/status: line "Uid:\t<real>\t<eff>\t<saved>\t<fs>"
+        let status = std::fs::read_to_string("/proc/self/status").ok()?;
+        for line in status.lines() {
+            if let Some(rest) = line.strip_prefix("Uid:") {
+                return rest.split_whitespace().next()?.parse().ok();
+            }
+        }
+        None
+    }
+
+    let Some(uid) = current_uid() else { return };
+    let runtime_dir = format!("/run/user/{uid}");
+    if !Path::new(&runtime_dir).is_dir() {
+        return;
+    }
+    // MSRV-friendly: `Option::is_none_or` is 1.82-stable, we're on 1.80.
+    let is_blank = |var: &str| {
+        std::env::var_os(var).map_or(true, |v| v.is_empty())
+    };
+    if is_blank("XDG_RUNTIME_DIR") {
+        std::env::set_var("XDG_RUNTIME_DIR", &runtime_dir);
+        tracing::info!(dir = %runtime_dir, "hydrated XDG_RUNTIME_DIR");
+    }
+    if is_blank("DBUS_SESSION_BUS_ADDRESS") {
+        let bus_path = format!("{runtime_dir}/bus");
+        if Path::new(&bus_path).exists() {
+            let addr = format!("unix:path={bus_path}");
+            std::env::set_var("DBUS_SESSION_BUS_ADDRESS", &addr);
+            tracing::info!(addr = %addr, "hydrated DBUS_SESSION_BUS_ADDRESS");
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn hydrate_dbus_env() {}
+
 /// Boot the application — registers plugins, app state and command handlers.
 pub fn run() {
     tracing_subscriber::fmt()
@@ -47,6 +103,12 @@ pub fn run() {
         .with_target(false)
         .compact()
         .init();
+
+    // Must run before Tauri spawns worker threads — env mutation is racy
+    // once other threads exist. keyring-rs is called from
+    // tokio::task::spawn_blocking on the first connect attempt, which is
+    // well after this point, so these vars will be in place by then.
+    hydrate_dbus_env();
 
     tauri::Builder::default()
         // tauri-plugin-log is intentionally NOT registered: tracing_subscriber
