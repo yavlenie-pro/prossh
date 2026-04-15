@@ -39,6 +39,10 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Cross-platform SSH/SCP client",
-    "longDescription": "ProSSH — modern cross-platform SSH/SCP client with tabs, split panes and SFTP file manager."
+    "longDescription": "ProSSH — modern cross-platform SSH/SCP client with tabs, split panes and SFTP file manager.",
+    "macOS": {
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "11.0"
+    }
   }
 }
