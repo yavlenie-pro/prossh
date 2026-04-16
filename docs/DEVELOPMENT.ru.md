@@ -58,6 +58,7 @@ prossh/
 │   ├── capabilities/        # Tauri 2 permission capabilities
 │   ├── examples/            # отдельные бинарники (`ssh_probe`, ...)
 │   ├── icons/               # платформенные иконки для инсталляторов
+│   ├── wix/                 # локализованные строки WiX для MSI (ru-RU.wxl, zh-CN.wxl)
 │   ├── src/
 │   │   ├── commands/        # обработчики #[tauri::command], по доменам
 │   │   ├── db/              # rusqlite-соединение + миграции
@@ -329,6 +330,9 @@ powershell -Command "Stop-Process -Name prossh -Force -ErrorAction SilentlyConti
 
 4. Добавьте опцию языка в `src/components/settings/SettingsDialog.tsx` (dropdown языка) и ключ `settings.lang<Code>` в каждый файл локали.
 5. Переведите документацию: `README.<code>.md`, `docs/USER_GUIDE.<code>.md`, `docs/DEVELOPMENT.<code>.md`, обновите language-switcher во всех существующих доках.
+6. **Windows-инсталлятор** — зарегистрируйте язык в `src-tauri/tauri.conf.json`, секция `bundle.windows`:
+   - `nsis.languages`: добавьте идентификатор языка NSIS (например `French`, `German`, `Japanese`). См. [полный список языков NSIS](https://github.com/kichik/nsis/tree/9465c08046f00ccb6eda985abbdbf52c275c6c4d/Contrib/Language%20files). Для большинства из них у `tauri-bundler` уже есть встроенные переводы — проверьте `crates/tauri-bundler/src/bundle/windows/nsis/languages/` в репозитории tauri; для отсутствующих нужен `customLanguageFiles`.
+   - `wix.language`: добавьте WiX-код локали (например `"fr-FR": { "localePath": "wix/fr-FR.wxl" }`) и создайте соответствующий `.wxl` рядом с `ru-RU.wxl` / `zh-CN.wxl`. Переводу подлежат только четыре строки (`LaunchApp`, `DowngradeErrorMessage`, `PathEnvVarFeature`, `InstallAppFeature`); `TauriLanguage` / `TauriCodepage` автоматически подставляются `tauri-bundler`'ом из его `languages.json`.
 
 ## Советы по дебагу
 

@@ -36,7 +36,7 @@ Signed installers for every platform are attached to each [GitHub Release](https
 
 | Platform | Artifacts |
 | --- | --- |
-| Windows | `ProSSH_*_x64-setup.exe` (NSIS), `ProSSH_*_x64_en-US.msi` |
+| Windows | `ProSSH_*_x64-setup.exe` (NSIS, multilingual — EN / RU / ZH), `ProSSH_*_x64_en-US.msi`, `_ru-RU.msi`, `_zh-CN.msi` |
 | macOS | `ProSSH_*_aarch64.dmg`, `ProSSH_*_x64.dmg` |
 | Linux | `prossh_*_amd64.deb`, `prossh_*_amd64.AppImage` |
 

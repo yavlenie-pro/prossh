@@ -58,6 +58,7 @@ prossh/
 │   ├── capabilities/        # Tauri 2 权限能力
 │   ├── examples/            # 独立二进制(`ssh_probe` ……)
 │   ├── icons/               # 打进安装包的平台图标
+│   ├── wix/                 # MSI 的 WiX 本地化字符串(ru-RU.wxl、zh-CN.wxl)
 │   ├── src/
 │   │   ├── commands/        # #[tauri::command] 处理器,按领域分组
 │   │   ├── db/              # rusqlite 连接 + 迁移
@@ -329,6 +330,9 @@ powershell -Command "Stop-Process -Name prossh -Force -ErrorAction SilentlyConti
 
 4. 在 `src/components/settings/SettingsDialog.tsx`(语言下拉)中添加语言选项,并在每种语言文件中加入 `settings.lang<Code>` key。
 5. 翻译文档:`README.<code>.md`、`docs/USER_GUIDE.<code>.md`、`docs/DEVELOPMENT.<code>.md`,并更新所有现有文档中的语言切换器链接。
+6. **Windows 安装包** —— 在 `src-tauri/tauri.conf.json` 的 `bundle.windows` 中注册新语言:
+   - `nsis.languages`:追加 NSIS 语言标识(如 `French`、`German`、`Japanese`)。参见 [NSIS 语言完整列表](https://github.com/kichik/nsis/tree/9465c08046f00ccb6eda985abbdbf52c275c6c4d/Contrib/Language%20files)。`tauri-bundler` 为其中大部分语言已内置翻译 —— 可查看 tauri 仓库的 `crates/tauri-bundler/src/bundle/windows/nsis/languages/`;未覆盖的语言需要在 `customLanguageFiles` 中提供自定义 `.nsh`。
+   - `wix.language`:添加 WiX 区域代码(如 `"fr-FR": { "localePath": "wix/fr-FR.wxl" }`),并在 `ru-RU.wxl` / `zh-CN.wxl` 旁边创建对应的 `.wxl`。只需翻译四个字符串(`LaunchApp`、`DowngradeErrorMessage`、`PathEnvVarFeature`、`InstallAppFeature`);`TauriLanguage` / `TauriCodepage` 由 `tauri-bundler` 从其 `languages.json` 自动注入。
 
 ## 调试技巧
 

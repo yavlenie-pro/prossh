@@ -43,6 +43,19 @@
     "macOS": {
       "hardenedRuntime": true,
       "minimumSystemVersion": "11.0"
+    },
+    "windows": {
+      "nsis": {
+        "languages": ["English", "Russian", "SimpChinese"],
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": {
+          "en-US": {},
+          "ru-RU": { "localePath": "wix/ru-RU.wxl" },
+          "zh-CN": { "localePath": "wix/zh-CN.wxl" }
+        }
+      }
     }
   }
 }

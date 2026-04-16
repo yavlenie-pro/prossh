@@ -58,6 +58,7 @@ prossh/
 │   ├── capabilities/        # Tauri 2 permission capabilities
 │   ├── examples/            # standalone binaries (`ssh_probe`, ...)
 │   ├── icons/               # platform icons bundled into installers
+│   ├── wix/                 # localized WiX strings for MSI (ru-RU.wxl, zh-CN.wxl)
 │   ├── src/
 │   │   ├── commands/        # #[tauri::command] handlers, grouped by domain
 │   │   ├── db/              # rusqlite connection + migrations
@@ -329,6 +330,9 @@ Let's say you're adding "session tags" (free-form labels on sessions).
 
 4. Add the language option in `src/components/settings/SettingsDialog.tsx` (language dropdown) and a `settings.lang<Code>` key in every locale file.
 5. Translate the documentation: `README.<code>.md`, `docs/USER_GUIDE.<code>.md`, `docs/DEVELOPMENT.<code>.md`, and update the language switcher links in all existing docs.
+6. **Windows installer** — register the language in `src-tauri/tauri.conf.json` under `bundle.windows`:
+   - `nsis.languages`: append the NSIS language identifier (e.g. `French`, `German`, `Japanese`). See the [full list of NSIS languages](https://github.com/kichik/nsis/tree/9465c08046f00ccb6eda985abbdbf52c275c6c4d/Contrib/Language%20files). Tauri's bundler ships translations for many of these out of the box — check `crates/tauri-bundler/src/bundle/windows/nsis/languages/` in the tauri repo; unlisted ones need a `customLanguageFiles` entry.
+   - `wix.language`: add the WiX locale code (e.g. `"fr-FR": { "localePath": "wix/fr-FR.wxl" }`) and create the matching `.wxl` file next to `ru-RU.wxl` / `zh-CN.wxl`. Only four strings need translating (`LaunchApp`, `DowngradeErrorMessage`, `PathEnvVarFeature`, `InstallAppFeature`); `TauriLanguage` / `TauriCodepage` are auto-injected from tauri-bundler's `languages.json`.
 
 ## Debugging tips
 

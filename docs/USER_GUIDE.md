@@ -32,7 +32,7 @@ This guide walks through every feature in ProSSH. If you just want the elevator 
 
 Pick the artifact for your OS from the [Releases](https://github.com/yavlenie-pro/prossh/releases) page:
 
-- **Windows** — `ProSSH_<version>_x64-setup.exe` (NSIS, recommended) or the `.msi` variant. Requires [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/); on Windows 11 it is preinstalled.
+- **Windows** — `ProSSH_<version>_x64-setup.exe` (NSIS, recommended) or an `.msi` variant. Both installers are localized into English, Russian and Simplified Chinese: the NSIS `.exe` picks the language from your OS locale automatically; the `.msi` ships as three separate files (`_en-US.msi`, `_ru-RU.msi`, `_zh-CN.msi`) — pick the one that matches your language. Requires [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/); on Windows 11 it is preinstalled.
 - **macOS** — `ProSSH_<version>_aarch64.dmg` for Apple Silicon, `ProSSH_<version>_x64.dmg` for Intel. The build is unsigned today; the first launch needs a right-click → **Open** to bypass Gatekeeper.
 - **Linux** — `.deb` for Debian/Ubuntu derivatives or the portable `.AppImage`. You need `libwebkit2gtk-4.1` (installed automatically by the `.deb`) and a Secret Service provider (`gnome-keyring` or `kwallet`) for password storage.
 

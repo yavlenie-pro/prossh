@@ -32,7 +32,7 @@
 
 在 [Releases](https://github.com/yavlenie-pro/prossh/releases) 页面选择适合你系统的安装包：
 
-- **Windows** —— `ProSSH_<version>_x64-setup.exe`（NSIS，推荐）或 `.msi` 版本。需要 [WebView2 运行时](https://developer.microsoft.com/microsoft-edge/webview2/)；Windows 11 已预装。
+- **Windows** —— `ProSSH_<version>_x64-setup.exe`（NSIS，推荐）或 `.msi` 版本。两种安装包都已本地化为英文、俄文和简体中文：NSIS 版 `.exe` 会根据系统语言自动选择界面语言；`.msi` 提供三个独立文件（`_en-US.msi`、`_ru-RU.msi`、`_zh-CN.msi`）—— 请选择与你的语言匹配的版本。需要 [WebView2 运行时](https://developer.microsoft.com/microsoft-edge/webview2/)；Windows 11 已预装。
 - **macOS** —— Apple Silicon 选择 `ProSSH_<version>_aarch64.dmg`，Intel 选择 `ProSSH_<version>_x64.dmg`。当前构建未签名；首次启动需要右键 → **打开** 以绕过 Gatekeeper。
 - **Linux** —— Debian/Ubuntu 衍生版本用 `.deb`，或使用可移植的 `.AppImage`。需要 `libwebkit2gtk-4.1`（`.deb` 包会自动安装）和密码服务（`gnome-keyring` 或 `kwallet`）来存储密码。
 

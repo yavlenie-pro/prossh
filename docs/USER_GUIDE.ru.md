@@ -32,7 +32,7 @@
 
 Возьмите артефакт под свою ОС со страницы [Releases](https://github.com/yavlenie-pro/prossh/releases):
 
-- **Windows** — `ProSSH_<версия>_x64-setup.exe` (NSIS, рекомендуется) или вариант `.msi`. Требуется [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/); в Windows 11 он предустановлен.
+- **Windows** — `ProSSH_<версия>_x64-setup.exe` (NSIS, рекомендуется) или вариант `.msi`. Оба инсталлятора локализованы на английский, русский и упрощённый китайский: NSIS-`.exe` автоматически выбирает язык по локали ОС; `.msi` поставляется тремя отдельными файлами (`_en-US.msi`, `_ru-RU.msi`, `_zh-CN.msi`) — берите соответствующий вашему языку. Требуется [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/); в Windows 11 он предустановлен.
 - **macOS** — `ProSSH_<версия>_aarch64.dmg` для Apple Silicon, `ProSSH_<версия>_x64.dmg` для Intel. Сборки пока без подписи; для первого запуска Gatekeeper потребует правого клика → **Open**.
 - **Linux** — `.deb` для Debian/Ubuntu или портативный `.AppImage`. Нужен `libwebkit2gtk-4.1` (ставится автоматически из `.deb`) и Secret Service (`gnome-keyring` или `kwallet`) для хранения паролей.
 
