@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use tokio::task::JoinHandle;
+use tauri::async_runtime::JoinHandle;
 
 /// Shared sync state. Cheap to clone (wraps everything in `Arc<Mutex<_>>`).
 #[derive(Default)]

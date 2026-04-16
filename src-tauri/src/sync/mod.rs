@@ -728,7 +728,11 @@ pub fn start_auto_sync(
     let conn_for_task = conn_mutex.clone();
     let runtime_for_task = runtime.clone();
     let app_for_task = app.clone();
-    let handle = tokio::spawn(async move {
+    // tauri::async_runtime::spawn — not tokio::spawn — because this can be
+    // called from Tauri's setup() closure, which on Windows is not inside a
+    // tokio runtime context. Raw tokio::spawn there aborts the process with
+    // "there is no reactor running" (panic=abort in release).
+    let handle = tauri::async_runtime::spawn(async move {
         let interval = std::time::Duration::from_secs((interval_min as u64).saturating_mul(60));
         loop {
             tokio::time::sleep(interval).await;
