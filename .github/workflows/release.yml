@@ -119,6 +119,41 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
 
+      # tauri-action v0 uploads macOS updater tarballs as `ProSSH_<arch>.app.tar.gz`
+      # — without the version — while every other artifact carries the version.
+      # The fix landed on tauri-action's `dev` branch but hasn't shipped to a
+      # `v0.x` release yet, so we post-process: delete the unversioned asset
+      # and re-upload it under the versioned name.
+      - name: Version macOS updater tarball name
+        if: matrix.platform == 'macos-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          version="${{ steps.ver.outputs.version }}"
+          tag="${GITHUB_REF_NAME}"
+          # tauri-action maps x86_64 → x64 on macOS; aarch64 is left as-is.
+          case "${{ matrix.target }}" in
+            aarch64-apple-darwin) arch=aarch64 ;;
+            x86_64-apple-darwin)  arch=x64 ;;
+            *) echo "Unknown macOS target: ${{ matrix.target }}" >&2; exit 1 ;;
+          esac
+          src="src-tauri/target/${{ matrix.target }}/release/bundle/macos/ProSSH.app.tar.gz"
+          if [ ! -f "$src" ]; then
+            echo "No updater tarball at $src — nothing to rename."
+            exit 0
+          fi
+          old_name="ProSSH_${arch}.app.tar.gz"
+          new_name="ProSSH_${version}_${arch}.app.tar.gz"
+          tmp="${RUNNER_TEMP}/${new_name}"
+          cp "$src" "$tmp"
+          gh release delete-asset "$tag" "$old_name" --yes \
+            --repo "${GITHUB_REPOSITORY}" 2>/dev/null || true
+          gh release upload "$tag" "$tmp" --clobber \
+            --repo "${GITHUB_REPOSITORY}"
+          echo "Uploaded: $new_name"
+
   build-arch:
     # Separate job (rather than an extra matrix row) because Arch's tooling —
     # makepkg, pacman, bsdtar — doesn't map onto GitHub's ubuntu/macos/windows
