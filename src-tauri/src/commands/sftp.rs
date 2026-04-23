@@ -209,7 +209,7 @@ pub async fn sftp_upload(
         map.insert(transfer_id.clone(), cancel.clone());
     }
     let result = transfer::upload(
-        &sess.sftp,
+        &sess.handle,
         std::path::Path::new(&local_path),
         &remote_path,
         transfer_id.clone(),
@@ -243,7 +243,7 @@ pub async fn sftp_download(
         map.insert(transfer_id.clone(), cancel.clone());
     }
     let result = transfer::download(
-        &sess.sftp,
+        &sess.handle,
         &remote_path,
         std::path::Path::new(&local_path),
         total_size,
@@ -281,8 +281,8 @@ pub async fn sftp_server_copy(
         map.insert(transfer_id.clone(), cancel.clone());
     }
     let result = transfer::server_copy(
-        &src_sess.sftp,
-        &dst_sess.sftp,
+        &src_sess.handle,
+        &dst_sess.handle,
         &src_path,
         &dst_path,
         total_size,
@@ -547,23 +547,18 @@ pub async fn sftp_download_temp(
         .map_err(|e| AppError::Io(format!("create temp dir: {e}")))?;
     let temp_path = temp_dir.join(&file_name);
 
-    {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        let mut remote_file = sess.sftp.open(&remote_path).await
-            .map_err(|e| AppError::Ssh(format!("open {remote_path}: {e}")))?;
-        let mut local_file = tokio::fs::File::create(&temp_path).await
-            .map_err(|e| AppError::Io(format!("create temp: {e}")))?;
-        let mut buf = vec![0u8; 32 * 1024];
-        loop {
-            let n = remote_file.read(&mut buf).await
-                .map_err(|e| AppError::Ssh(format!("read: {e}")))?;
-            if n == 0 { break; }
-            local_file.write_all(&buf[..n]).await
-                .map_err(|e| AppError::Io(format!("write: {e}")))?;
-        }
-        local_file.flush().await
-            .map_err(|e| AppError::Io(format!("flush: {e}")))?;
-    }
+    // Size is 0 here → download() streams until EOF.
+    let fake_progress: Channel<TransferProgress> = Channel::new(|_| Ok(()));
+    transfer::download(
+        &sess.handle,
+        &remote_path,
+        &temp_path,
+        0,
+        format!("drag-{}", uuid::Uuid::new_v4()),
+        &fake_progress,
+        CancellationToken::new(),
+    )
+    .await?;
 
     Ok(temp_path.to_string_lossy().into_owned())
 }
@@ -589,35 +584,17 @@ pub async fn sftp_download_for_edit(
         .map_err(|e| AppError::Io(format!("create edit temp dir: {e}")))?;
     let temp_path = temp_dir.join(&file_name);
 
-    {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        let mut remote_file = sess
-            .sftp
-            .open(&remote_path)
-            .await
-            .map_err(|e| AppError::Ssh(format!("open {remote_path}: {e}")))?;
-        let mut local_file = tokio::fs::File::create(&temp_path)
-            .await
-            .map_err(|e| AppError::Io(format!("create temp: {e}")))?;
-        let mut buf = vec![0u8; 32 * 1024];
-        loop {
-            let n = remote_file
-                .read(&mut buf)
-                .await
-                .map_err(|e| AppError::Ssh(format!("read: {e}")))?;
-            if n == 0 {
-                break;
-            }
-            local_file
-                .write_all(&buf[..n])
-                .await
-                .map_err(|e| AppError::Io(format!("write: {e}")))?;
-        }
-        local_file
-            .flush()
-            .await
-            .map_err(|e| AppError::Io(format!("flush: {e}")))?;
-    }
+    let fake_progress: Channel<TransferProgress> = Channel::new(|_| Ok(()));
+    transfer::download(
+        &sess.handle,
+        &remote_path,
+        &temp_path,
+        0,
+        format!("edit-{edit_id}"),
+        &fake_progress,
+        CancellationToken::new(),
+    )
+    .await?;
 
     Ok(temp_path.to_string_lossy().into_owned())
 }
