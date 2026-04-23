@@ -79,7 +79,7 @@ fn parse_mxtsessions(content: &str) -> Vec<MobaSession> {
         }
     }
 
-    sessions.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    sessions.sort_by_key(|s| s.name.to_lowercase());
     sessions
 }
 
@@ -244,7 +244,7 @@ pub fn read_moba_sessions() -> Result<Vec<MobaSession>, AppError> {
         });
     }
 
-    sessions.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    sessions.sort_by_key(|s| s.name.to_lowercase());
     Ok(sessions)
 }
 

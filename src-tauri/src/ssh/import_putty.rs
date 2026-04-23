@@ -74,7 +74,7 @@ pub fn read_putty_sessions() -> Result<Vec<PuttySession>, AppError> {
         });
     }
 
-    sessions.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    sessions.sort_by_key(|s| s.name.to_lowercase());
     Ok(sessions)
 }
 
