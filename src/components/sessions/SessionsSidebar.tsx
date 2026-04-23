@@ -108,6 +108,12 @@ export function SessionsSidebar() {
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const focusFirstResult = () => {
+    const first = listRef.current?.querySelector<HTMLElement>('[role="button"][tabindex="0"]');
+    first?.focus();
+  };
 
   // Expanded groups (default = all collapsed).
   // Persisted in localStorage so the state survives reloads.
@@ -284,6 +290,15 @@ export function SessionsSidebar() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "ArrowDown") {
+                e.preventDefault();
+                focusFirstResult();
+              } else if (e.key === "Escape" && search) {
+                e.preventDefault();
+                setSearch("");
+              }
+            }}
             placeholder={t("sidebar.searchPlaceholder")}
             className="w-full rounded border border-border-subtle bg-bg py-1 pl-6 pr-6 text-xs text-fg placeholder:text-fg-subtle outline-none focus:border-accent"
           />
@@ -298,7 +313,7 @@ export function SessionsSidebar() {
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto py-1">
+        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
           {loading && sessions.length === 0 && (
             <div className="px-3 py-4 text-xs text-fg-muted">Loading…</div>
           )}

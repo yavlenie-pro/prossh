@@ -103,6 +103,19 @@ export function AppShell() {
     };
   }, [saveTabs]);
 
+  // --- Auto-focus terminal of active tab ------------------------------------
+  // Tabs stay mounted and are toggled via CSS, so xterm.focus() from useXterm
+  // only runs once per mount. Re-focus the active tab's terminal whenever
+  // activeTabId changes (click, palette, auto-switch on close, restore).
+  useEffect(() => {
+    if (!activeTabId) return;
+    const raf = requestAnimationFrame(() => {
+      const active = document.querySelector('[data-active-tab="true"]');
+      active?.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea")?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeTabId]);
+
   // --- Keyboard shortcuts ---------------------------------------------------
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -158,6 +171,7 @@ export function AppShell() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
+              data-active-tab={tab.id === activeTabId ? "true" : undefined}
               className={
                 tab.id === activeTabId
                   ? "flex min-h-0 flex-1 flex-col"
