@@ -9,6 +9,8 @@
 
 ProSSH — десктопный SSH-клиент на Rust + React поверх [Tauri 2](https://tauri.app/). Быстрый WebGL-терминал ([xterm.js](https://xtermjs.org/)), SFTP-панель, прямое копирование между серверами, проброс портов и импорт сессий из PuTTY, MobaXterm и `~/.ssh/config` — всё это в нативном бинарнике ~15 МБ.
 
+![ProSSH: вкладки с SSH-сессиями и SFTP-панель рядом с терминалом](docs/screenshots/terminal-tabs.png)
+
 ---
 
 ## Возможности

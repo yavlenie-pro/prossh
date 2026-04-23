@@ -9,6 +9,8 @@
 
 ProSSH is a desktop SSH client written in Rust + React on top of [Tauri 2](https://tauri.app/). It packs a fast WebGL terminal ([xterm.js](https://xtermjs.org/)), an SFTP panel, server‑to‑server copy, port forwarding and one‑click imports from PuTTY, MobaXterm and `~/.ssh/config` — all in a ~15 MB native binary.
 
+![ProSSH: tabbed SSH sessions with the SFTP panel alongside the terminal](docs/screenshots/terminal-tabs.png)
+
 ---
 
 ## Features
