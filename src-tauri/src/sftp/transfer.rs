@@ -53,6 +53,9 @@ const PIPELINE_DEPTH: usize = 16;
 const LOCAL_BUF: usize = 4 * 1024 * 1024;
 const PROGRESS_THROTTLE: std::time::Duration = std::time::Duration::from_millis(50);
 
+/// Handle for a pipelined SFTP read task: returns `(offset, data, eof)`.
+type ReadJoinHandle = tokio::task::JoinHandle<Result<(u64, Vec<u8>, bool), AppError>>;
+
 /// Open a fresh SFTP subsystem on the given SSH connection and return a
 /// `RawSftpSession`. Used for pipelined transfers — we need the raw API
 /// because the high-level `File` wrapper can only have one read/write in
@@ -234,8 +237,7 @@ pub async fn download(
         .map_err(|e| AppError::Io(format!("create {}: {e}", local_path.display())))?;
     let mut local_file = BufWriter::with_capacity(LOCAL_BUF, local_raw);
 
-    let mut inflight: VecDeque<tokio::task::JoinHandle<Result<(u64, Vec<u8>, bool), AppError>>> =
-        VecDeque::with_capacity(PIPELINE_DEPTH);
+    let mut inflight: VecDeque<ReadJoinHandle> = VecDeque::with_capacity(PIPELINE_DEPTH);
     let mut next_read_offset: u64 = 0;
     let mut bytes_recv: u64 = 0;
     let mut last_report = std::time::Instant::now();
@@ -405,8 +407,7 @@ pub async fn server_copy(
         .map_err(|e| AppError::Ssh(format!("create dest {dst_path}: {e}")))?
         .handle;
 
-    let mut read_inflight: VecDeque<tokio::task::JoinHandle<Result<(u64, Vec<u8>, bool), AppError>>> =
-        VecDeque::with_capacity(PIPELINE_DEPTH);
+    let mut read_inflight: VecDeque<ReadJoinHandle> = VecDeque::with_capacity(PIPELINE_DEPTH);
     let mut write_inflight: VecDeque<tokio::task::JoinHandle<Result<usize, AppError>>> =
         VecDeque::with_capacity(PIPELINE_DEPTH);
     let mut next_read_offset: u64 = 0;
