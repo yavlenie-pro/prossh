@@ -854,11 +854,29 @@ export function FilesBrowser() {
   );
 
   // ── Tauri native drag-drop (OS → app) ──────────────────────────────────────
+  //
+  // NB: `onDragDropEvent` returns a Promise<UnlistenFn>. The handler is
+  // registered synchronously in Rust, but the unlisten fn only arrives after
+  // the IPC round-trip. If the effect's cleanup runs before `.then` resolves,
+  // the stored `unlisten` is still null and the listener leaks — on the next
+  // registration we end up with *two* handlers, so a single OS drop fires
+  // `doUpload` twice (or more). To avoid this:
+  //   1. Keep volatile values (`cwd`, `dropTargetPath`, `doUpload`) in refs so
+  //      this effect only re-runs when `sftpId` truly changes.
+  //   2. Guard with a `cancelled` flag: if cleanup fires before the unlisten
+  //      is available, invoke it as soon as it arrives.
+
+  const cwdRef = useRef(cwd);
+  const dropTargetPathRef = useRef(dropTargetPath);
+  const doUploadRef = useRef(doUpload);
+  useEffect(() => { cwdRef.current = cwd; }, [cwd]);
+  useEffect(() => { dropTargetPathRef.current = dropTargetPath; }, [dropTargetPath]);
+  useEffect(() => { doUploadRef.current = doUpload; }, [doUpload]);
 
   useEffect(() => {
     if (!sftpId) return;
+    let cancelled = false;
     let unlisten: (() => void) | null = null;
-    const currentCwd = cwd;
 
     void getCurrentWebview()
       .onDragDropEvent((event) => {
@@ -874,9 +892,9 @@ export function FilesBrowser() {
             overwriteAllRef.current = "none";
             const paths = event.payload.paths;
             if (paths.length > 0) {
-              const target = dropTargetPath ?? currentCwd;
+              const target = dropTargetPathRef.current ?? cwdRef.current;
               for (const p of paths) {
-                void doUpload(p, target);
+                void doUploadRef.current(p, target);
               }
             }
             setDropTargetPath(null);
@@ -889,13 +907,15 @@ export function FilesBrowser() {
         }
       })
       .then((fn) => {
-        unlisten = fn;
+        if (cancelled) fn();
+        else unlisten = fn;
       });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
-  }, [sftpId, cwd, dropTargetPath, doUpload]);
+  }, [sftpId]);
 
   // ── Drag-out (app → OS) via tauri-plugin-drag ──────────────────────────────
 
