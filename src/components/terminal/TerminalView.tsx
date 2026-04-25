@@ -94,9 +94,13 @@ export function TerminalView({ session, paneId }: Props) {
   useEffect(() => {
     if (status !== "disconnected" && status !== "error") return;
     const handler = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input/textarea (e.g. dialog)
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Ignore if user is typing in an input/textarea (e.g. dialog),
+      // but allow xterm's hidden helper textarea — it stays focused
+      // even after disconnect, so R would otherwise never fire.
+      const target = e.target as HTMLElement;
+      const tag = target.tagName;
+      const isXtermHelper = target.classList?.contains("xterm-helper-textarea");
+      if (!isXtermHelper && (tag === "INPUT" || tag === "TEXTAREA")) return;
       if (e.key === "r" || e.key === "R") {
         e.preventDefault();
         reconnect();
