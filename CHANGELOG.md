@@ -7,9 +7,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- Keyboard navigation from the session search field: pressing `Enter` or `↓`
-  focuses the first matching session (`Esc` clears the filter). Lets you drive
-  the sidebar entirely from the keyboard.
+- Full keyboard navigation in the sessions sidebar: `Enter` / `↓` in the
+  search field jumps to the first match; `↑` / `↓` walk between rows;
+  `Enter` connects; `↑` on the first row or `Esc` returns to the search
+  field. Focused rows now show a discreet accent ring instead of the
+  browser's default white outline, and only when the user is actually
+  driving with the keyboard (`focus-visible`).
 - Clicking a tab now moves focus straight into that tab's terminal, so the
   next keystroke lands on the shell instead of the tab strip. Also applies
   when the active tab changes via the command palette, tab close, or

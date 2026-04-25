@@ -111,7 +111,7 @@ export function SessionsSidebar() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const focusFirstResult = () => {
-    const first = listRef.current?.querySelector<HTMLElement>('[role="button"][tabindex="0"]');
+    const first = listRef.current?.querySelector<HTMLElement>("[data-session-row]");
     first?.focus();
   };
 
@@ -288,6 +288,7 @@ export function SessionsSidebar() {
           <input
             ref={searchRef}
             type="text"
+            data-session-search
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
@@ -685,16 +686,44 @@ function SessionRow({
     <div
       role="button"
       tabIndex={0}
+      data-session-row
       onClick={onConnect}
       onKeyDown={(e) => {
+        if (renaming) return; // rename input handles its own keys
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
+          e.stopPropagation();
           onConnect();
+          return;
+        }
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const rows = Array.from(
+            document.querySelectorAll<HTMLElement>("[data-session-row]"),
+          );
+          const idx = rows.indexOf(e.currentTarget);
+          if (idx < 0) return;
+          const next = e.key === "ArrowDown" ? rows[idx + 1] : rows[idx - 1];
+          if (next) {
+            next.focus();
+          } else if (e.key === "ArrowUp") {
+            document
+              .querySelector<HTMLInputElement>("[data-session-search]")
+              ?.focus();
+          }
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          document
+            .querySelector<HTMLInputElement>("[data-session-search]")
+            ?.focus();
         }
       }}
       className={cn(
         "group flex cursor-pointer items-center gap-2 py-1.5 pr-3 text-left text-sm",
         "hover:bg-bg-overlay",
+        "focus:outline-none focus-visible:bg-accent/15 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60",
       )}
       style={{ paddingLeft }}
     >
