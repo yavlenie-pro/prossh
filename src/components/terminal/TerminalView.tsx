@@ -90,21 +90,17 @@ export function TerminalView({ session, paneId }: Props) {
     });
   };
 
-  // Hotkey: R to reconnect when disconnected or error
+  // Hotkey: R to reconnect when disconnected or error.
+  // Layout-independent (e.code), fires from any focus. Active-tab guard so a
+  // hidden disconnected pane in another tab doesn't swallow R.
   useEffect(() => {
     if (status !== "disconnected" && status !== "error") return;
     const handler = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input/textarea (e.g. dialog),
-      // but allow xterm's hidden helper textarea — it stays focused
-      // even after disconnect, so R would otherwise never fire.
-      const target = e.target as HTMLElement;
-      const tag = target.tagName;
-      const isXtermHelper = target.classList?.contains("xterm-helper-textarea");
-      if (!isXtermHelper && (tag === "INPUT" || tag === "TEXTAREA")) return;
-      if (e.key === "r" || e.key === "R") {
-        e.preventDefault();
-        reconnect();
-      }
+      if (e.code !== "KeyR") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!containerRef.current?.closest('[data-active-tab="true"]')) return;
+      e.preventDefault();
+      reconnect();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
