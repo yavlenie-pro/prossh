@@ -30,3 +30,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   twice when the drag-drop listener re-subscribed before its unlisten handle
   had arrived from the Tauri IPC round-trip. The subscription is now guarded
   so the stale handler is disposed as soon as it lands.
+- The `R` reconnect hotkey is now layout-independent (binds to the physical
+  key via `e.code`, so it fires on Russian and other non-Latin layouts) and
+  fires from any focus inside the active tab. A disconnected pane in a
+  hidden tab no longer steals `R` from a connected terminal in the visible
+  tab.
