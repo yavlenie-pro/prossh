@@ -4,7 +4,7 @@ All notable changes to **ProSSH** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] — 2026-05-04
 
 ### Added
 - Full keyboard navigation in the sessions sidebar: `Enter` / `↓` in the
@@ -35,3 +35,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fires from any focus inside the active tab. A disconnected pane in a
   hidden tab no longer steals `R` from a connected terminal in the visible
   tab.
+- SFTP file browser now preserves the working directory when switching
+  between tabs. Previously switching away and back reset the browser to
+  the initial directory.
