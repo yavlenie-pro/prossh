@@ -93,6 +93,11 @@ export function TerminalView({ session, paneId }: Props) {
   // Hotkey: R to reconnect when disconnected or error.
   // Layout-independent (e.code), fires from any focus. Active-tab guard so a
   // hidden disconnected pane in another tab doesn't swallow R.
+  //
+  // Capture phase is required: xterm.js registers its keydown handler on its
+  // helper textarea in capture phase and stopPropagation()s most keys (only
+  // bare uppercase A-Z slip through), so a bubble-phase listener never sees
+  // lowercase 'r' or any non-Latin layout (Russian К, etc.).
   useEffect(() => {
     if (status !== "disconnected" && status !== "error") return;
     const handler = (e: KeyboardEvent) => {
@@ -100,10 +105,11 @@ export function TerminalView({ session, paneId }: Props) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (!containerRef.current?.closest('[data-active-tab="true"]')) return;
       e.preventDefault();
+      e.stopPropagation();
       reconnect();
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
   }, [status, reconnect]);
 
   return (

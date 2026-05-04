@@ -37,6 +37,7 @@ prossh-debug.log
 # Tauri
 src-tauri/target/
 src-tauri/gen/schemas/
+*.exe
 
 # Rust
 Cargo.lock.user
