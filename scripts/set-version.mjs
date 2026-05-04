@@ -35,12 +35,12 @@ fs.writeFileSync(confPath, JSON.stringify(conf, null, 2) + '\n');
 // Dependencies further down also use `version = "..."` and must stay put.
 const cargoPath = 'src-tauri/Cargo.toml';
 const cargo = fs.readFileSync(cargoPath, 'utf8');
-const patched = cargo.replace(/^version = "[^"]+"/m, `version = "${bundleVersion}"`);
-if (patched === cargo) {
+const versionRe = /^version = "[^"]+"/m;
+if (!versionRe.test(cargo)) {
   console.error(`failed to find package version line in ${cargoPath}`);
   process.exit(1);
 }
-fs.writeFileSync(cargoPath, patched);
+fs.writeFileSync(cargoPath, cargo.replace(versionRe, `version = "${bundleVersion}"`));
 
 if (bundleVersion === rawVersion) {
   console.log(`bundle version → ${bundleVersion}`);
