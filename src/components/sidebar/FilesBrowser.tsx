@@ -226,14 +226,14 @@ export function FilesBrowser() {
   // ── SFTP lifecycle ──────────────────────────────────────────────────────────
   // Cache SFTP connections by sessionId so switching tabs doesn't kill
   // background operations (rsync, transfers, etc.)
-  const sftpCacheRef = useRef<Map<string, string>>(new Map());
+  const sftpCacheRef = useRef<Map<string, { id: string; cwd: string }>>(new Map());
 
   useEffect(() => {
     if (!sessionId || sessionId === sftpForSession.current) return;
 
-    // Save current sftpId in cache (do NOT close it)
+    // Save current sftpId + cwd in cache (do NOT close it)
     if (sftpForSession.current && sftpId) {
-      sftpCacheRef.current.set(sftpForSession.current, sftpId);
+      sftpCacheRef.current.set(sftpForSession.current, { id: sftpId, cwd });
     }
 
     sftpForSession.current = sessionId;
@@ -248,7 +248,8 @@ export function FilesBrowser() {
     const cached = sftpCacheRef.current.get(sessionId);
     if (cached) {
       sftpCacheRef.current.delete(sessionId);
-      setSftpId(cached);
+      initialDirRef.current = cached.cwd;
+      setSftpId(cached.id);
       setConnecting(false);
       return;
     }
@@ -283,8 +284,8 @@ export function FilesBrowser() {
     return () => {
       // On unmount, close ALL cached connections + current
       if (sftpId) void sftpApi.close(sftpId);
-      for (const rid of sftpCacheRef.current.values()) {
-        void sftpApi.close(rid);
+      for (const entry of sftpCacheRef.current.values()) {
+        void sftpApi.close(entry.id);
       }
       sftpCacheRef.current.clear();
     };
