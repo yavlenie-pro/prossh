@@ -4,6 +4,20 @@ All notable changes to **ProSSH** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-05-08
+
+### Fixed
+- Tabs in the title bar can now actually be dropped after a drag. The
+  `dragover` handler read the dragging-id from a stale closure on its
+  first invocation, so `preventDefault` was skipped and the browser
+  refused every drop with the "no-drop" cursor. Tracked through a ref
+  alongside React state.
+- The 0.1.2 SFTP `..` row appeared in the dual-pane SFTP tab view but
+  not in the sidebar file browser — which is the view most users see.
+  The sidebar now shows a `..` row at the top whenever the current
+  directory is not `/`. It also accepts internal drops so an entry can
+  be moved one level up by dragging onto it.
+
 ## [0.1.2] — 2026-05-08
 
 ### Added
