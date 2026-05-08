@@ -4,30 +4,22 @@ All notable changes to **ProSSH** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.3] — 2026-05-08
-
-### Fixed
-- Tabs in the title bar can now actually be dropped after a drag. The
-  `dragover` handler read the dragging-id from a stale closure on its
-  first invocation, so `preventDefault` was skipped and the browser
-  refused every drop with the "no-drop" cursor. Tracked through a ref
-  alongside React state.
-- The 0.1.2 SFTP `..` row appeared in the dual-pane SFTP tab view but
-  not in the sidebar file browser — which is the view most users see.
-  The sidebar now shows a `..` row at the top whenever the current
-  directory is not `/`. It also accepts internal drops so an entry can
-  be moved one level up by dragging onto it.
-
 ## [0.1.2] — 2026-05-08
 
 ### Added
-- SFTP file browser shows a virtual `..` row at the top of each panel
-  (local and remote) when the current directory is not a filesystem
-  root. Double-clicking it ascends one level. Hidden at POSIX `/` and
-  Windows drive roots.
+- SFTP file browser shows a virtual `..` row at the top whenever the
+  current directory is not a filesystem root, in both the sidebar
+  view and the dual-pane SFTP tab. Double-clicking ascends one level.
+  Hidden at POSIX `/` and Windows drive roots. The sidebar row also
+  accepts internal drops so an entry can be moved one level up by
+  dragging onto it. Rendered with a Г-shaped corner-arrow icon.
 - Tabs in the title bar can now be reordered by drag-and-drop. A thin
   accent bar between tabs marks the prospective insert position; the
-  dragged tab dims for visual feedback.
+  dragged tab dims for visual feedback. Implementation uses manual
+  mouse tracking rather than the HTML5 dnd API because Tauri 2 on
+  Windows installs an OS-level drag-drop handler (required by the
+  sidebar file browser for OS file uploads) that hijacks the mouse
+  mid-drag and breaks the native dnd path.
 
 ## [0.1.1] — 2026-05-04
 
