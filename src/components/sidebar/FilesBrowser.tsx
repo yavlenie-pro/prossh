@@ -1286,6 +1286,40 @@ export function FilesBrowser() {
           onDragOver={onListDragOver}
           onDrop={onListDrop}
         >
+          {/* Virtual `..` row — ascends to the parent. Hidden at the POSIX
+              root and accepts internal drops so users can move entries up by
+              dropping onto it. */}
+          {cwd !== "/" && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={goUp}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") goUp();
+              }}
+              onDragOver={(e) => {
+                const parent = cwd.split("/").slice(0, -1).join("/") || "/";
+                onDirDragOver(e, parent);
+              }}
+              onDragLeave={(e) => {
+                const parent = cwd.split("/").slice(0, -1).join("/") || "/";
+                onDirDragLeave(e, parent);
+              }}
+              onDrop={(e) => {
+                const parent = cwd.split("/").slice(0, -1).join("/") || "/";
+                onDirDrop(e, parent);
+              }}
+              className={cn(
+                "group flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs hover:bg-bg-overlay",
+                dropTargetPath ===
+                  (cwd.split("/").slice(0, -1).join("/") || "/") &&
+                  "rounded-sm bg-accent/15 ring-1 ring-accent/40",
+              )}
+            >
+              <Folder className="h-3.5 w-3.5 shrink-0 text-accent" />
+              <span className="min-w-0 flex-1 truncate text-fg">..</span>
+            </div>
+          )}
           {entries.map((entry) => {
             const isDragSource = draggingEntry === entry.path;
             const isDropTarget =

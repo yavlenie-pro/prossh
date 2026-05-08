@@ -1,5 +1,5 @@
 import { Folder, X } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { detectOsFromSession, OsIcon, osColor } from "@/components/ui/OsIcon";
@@ -26,16 +26,25 @@ export function TabBar() {
   const reorderTabs = useTabsStore((s) => s.reorderTabs);
 
   /**
-   * `draggingId` — id of the tab currently being dragged (null while idle).
-   * `dropIndex` — insert-before position in the *current* tab array; null when
-   * the prospective drop is a no-op (back to the same place).
+   * `draggingId` — id of the tab currently being dragged. Tracked in BOTH a
+   * ref (read synchronously from event handlers, so the very first
+   * `dragover` after `dragstart` sees the new value before React commits the
+   * next render) and React state (drives the dimmed-tab visual). Without the
+   * ref the first `dragover` reads a stale closure where the id is still
+   * null, the early return skips `preventDefault`, and the browser shows the
+   * "no-drop" cursor for the rest of the drag.
+   *
+   * `dropIndex` — insert-before position in the *current* tab array; null
+   * when the prospective drop is a no-op (back to the same place).
    */
+  const draggingIdRef = useRef<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   if (tabs.length === 0) return null;
 
   const handleDragStart = (e: React.DragEvent, tabId: string) => {
+    draggingIdRef.current = tabId;
     setDraggingId(tabId);
     e.dataTransfer.effectAllowed = "move";
     // Some browsers require dataTransfer to be set for the drag to start.
@@ -43,18 +52,20 @@ export function TabBar() {
   };
 
   const handleDragEnd = () => {
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDropIndex(null);
   };
 
   const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
-    if (!draggingId) return;
+    const dragId = draggingIdRef.current;
+    if (!dragId) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const after = e.clientX - rect.left > rect.width / 2;
     const candidate = after ? targetIndex + 1 : targetIndex;
-    const fromIndex = tabs.findIndex((t) => t.id === draggingId);
+    const fromIndex = tabs.findIndex((t) => t.id === dragId);
     // Hide the indicator when the resulting move would be a no-op.
     if (candidate === fromIndex || candidate === fromIndex + 1) {
       setDropIndex(null);
@@ -65,9 +76,8 @@ export function TabBar() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const fromIndex = draggingId
-      ? tabs.findIndex((t) => t.id === draggingId)
-      : -1;
+    const dragId = draggingIdRef.current;
+    const fromIndex = dragId ? tabs.findIndex((t) => t.id === dragId) : -1;
     if (fromIndex !== -1 && dropIndex !== null) {
       // dropIndex is "insert before" in the pre-move array. Convert it to the
       // post-move array index expected by reorderTabs (which lands the moved
@@ -76,6 +86,7 @@ export function TabBar() {
       if (toIndex > fromIndex) toIndex--;
       if (toIndex !== fromIndex) reorderTabs(fromIndex, toIndex);
     }
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDropIndex(null);
   };
