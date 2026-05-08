@@ -66,6 +66,9 @@ interface Actions {
   closeTab: (tabId: string) => string[];
   /** Activate (switch to) a tab. */
   activateTab: (tabId: string) => void;
+  /** Move tab from `fromIndex` to `toIndex` in the tab strip. The moved tab
+   *  ends up exactly at `toIndex` in the new ordering. */
+  reorderTabs: (fromIndex: number, toIndex: number) => void;
   /** Split the focused pane in the active tab. */
   splitPane: (direction: "horizontal" | "vertical") => void;
   /** Close a specific pane leaf by id. If it was the last pane in the tab,
@@ -162,6 +165,23 @@ export const useTabsStore = create<State & Actions>((set, get) => ({
       };
     });
   },
+
+  reorderTabs: (fromIndex, toIndex) =>
+    set((s) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        fromIndex >= s.tabs.length ||
+        toIndex < 0 ||
+        toIndex >= s.tabs.length
+      ) {
+        return s;
+      }
+      const tabs = [...s.tabs];
+      const [moved] = tabs.splice(fromIndex, 1);
+      tabs.splice(toIndex, 0, moved);
+      return { tabs };
+    }),
 
   splitPane: (direction) => {
     const { tabs, activeTabId, focusedPaneId } = get();

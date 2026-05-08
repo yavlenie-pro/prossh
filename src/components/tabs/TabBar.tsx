@@ -1,5 +1,5 @@
 import { Folder, X } from "lucide-react";
-import { useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { detectOsFromSession, OsIcon, osColor } from "@/components/ui/OsIcon";
@@ -13,14 +13,72 @@ import { useTabsStore } from "@/stores/tabs";
  * fill the available space up to a comfortable maximum width and each one
  * shows the host's OS icon next to the label. An unread-output dot appears
  * on inactive tabs that produced output since they were last focused.
+ *
+ * Tabs are reorderable by drag-and-drop: grabbing a tab and dropping it on
+ * another inserts the dragged tab to that side of the target. A thin accent
+ * line is rendered between tabs to indicate the upcoming insert position.
  */
 export function TabBar() {
   const tabs = useTabsStore((s) => s.tabs);
   const activeTabId = useTabsStore((s) => s.activeTabId);
   const activateTab = useTabsStore((s) => s.activateTab);
   const closeTab = useTabsStore((s) => s.closeTab);
+  const reorderTabs = useTabsStore((s) => s.reorderTabs);
+
+  /**
+   * `draggingId` — id of the tab currently being dragged (null while idle).
+   * `dropIndex` — insert-before position in the *current* tab array; null when
+   * the prospective drop is a no-op (back to the same place).
+   */
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   if (tabs.length === 0) return null;
+
+  const handleDragStart = (e: React.DragEvent, tabId: string) => {
+    setDraggingId(tabId);
+    e.dataTransfer.effectAllowed = "move";
+    // Some browsers require dataTransfer to be set for the drag to start.
+    e.dataTransfer.setData("text/plain", tabId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDropIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
+    if (!draggingId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const after = e.clientX - rect.left > rect.width / 2;
+    const candidate = after ? targetIndex + 1 : targetIndex;
+    const fromIndex = tabs.findIndex((t) => t.id === draggingId);
+    // Hide the indicator when the resulting move would be a no-op.
+    if (candidate === fromIndex || candidate === fromIndex + 1) {
+      setDropIndex(null);
+    } else {
+      setDropIndex(candidate);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const fromIndex = draggingId
+      ? tabs.findIndex((t) => t.id === draggingId)
+      : -1;
+    if (fromIndex !== -1 && dropIndex !== null) {
+      // dropIndex is "insert before" in the pre-move array. Convert it to the
+      // post-move array index expected by reorderTabs (which lands the moved
+      // tab exactly at toIndex).
+      let toIndex = dropIndex;
+      if (toIndex > fromIndex) toIndex--;
+      if (toIndex !== fromIndex) reorderTabs(fromIndex, toIndex);
+    }
+    setDraggingId(null);
+    setDropIndex(null);
+  };
 
   return (
     <div
@@ -28,29 +86,57 @@ export function TabBar() {
       data-tauri-drag-region
       className="flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto pl-1 pr-2 pt-1"
     >
-      {tabs.map((tab) => (
-        <TabButton
-          key={tab.id}
-          tab={tab}
-          active={tab.id === activeTabId}
-          onActivate={() => activateTab(tab.id)}
-          onClose={() => closeTab(tab.id)}
-        />
+      {tabs.map((tab, i) => (
+        <Fragment key={tab.id}>
+          {dropIndex === i && <DropIndicator />}
+          <TabButton
+            tab={tab}
+            active={tab.id === activeTabId}
+            dragging={draggingId === tab.id}
+            onActivate={() => activateTab(tab.id)}
+            onClose={() => closeTab(tab.id)}
+            onDragStart={(e) => handleDragStart(e, tab.id)}
+            onDragEnd={handleDragEnd}
+            onDragOver={(e) => handleDragOver(e, i)}
+            onDrop={handleDrop}
+          />
+        </Fragment>
       ))}
+      {dropIndex === tabs.length && <DropIndicator />}
     </div>
+  );
+}
+
+/** Thin vertical bar shown between tabs at the prospective drop position. */
+function DropIndicator() {
+  return (
+    <div
+      aria-hidden
+      className="my-1 w-0.5 shrink-0 self-stretch rounded-full bg-accent"
+    />
   );
 }
 
 function TabButton({
   tab,
   active,
+  dragging,
   onActivate,
   onClose,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
 }: {
   tab: Tab;
   active: boolean;
+  dragging: boolean;
   onActivate: () => void;
   onClose: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragEnd: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
 }) {
   const { t } = useTranslation();
   const unread = useTabsStore((s) => !!s.unreadTabs[tab.id]);
@@ -69,6 +155,7 @@ function TabButton({
       role="tab"
       tabIndex={0}
       aria-selected={active}
+      draggable
       onClick={onActivate}
       onMouseDown={(e) => {
         // Middle-click closes the tab (matches Chrome / VS Code / WT).
@@ -83,11 +170,16 @@ function TabButton({
           onActivate();
         }
       }}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       className={cn(
         "group relative flex min-w-[140px] max-w-[240px] flex-1 cursor-pointer items-center gap-2 overflow-hidden rounded-t-md border-x border-t px-3 text-xs transition-colors",
         active
           ? "border-border-subtle bg-bg text-fg"
           : "border-transparent text-fg-muted hover:bg-bg-overlay hover:text-fg",
+        dragging && "opacity-50",
       )}
     >
       {/* Unread dot — slot is always reserved so neighbouring content
