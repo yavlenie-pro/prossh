@@ -46,6 +46,7 @@ import { save, open, ask } from "@tauri-apps/plugin-dialog";
 import {
   ArrowLeft,
   ArrowRight,
+  CornerLeftUp,
   Download,
   ExternalLink,
   File,
@@ -1316,7 +1317,7 @@ export function FilesBrowser() {
                   "rounded-sm bg-accent/15 ring-1 ring-accent/40",
               )}
             >
-              <Folder className="h-3.5 w-3.5 shrink-0 text-accent" />
+              <CornerLeftUp className="h-3.5 w-3.5 shrink-0 text-accent" />
               <span className="min-w-0 flex-1 truncate text-fg">..</span>
             </div>
           )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
+  CornerLeftUp,
   File,
   Folder,
   Loader2,
@@ -343,6 +344,7 @@ export function SftpExplorer({ session }: Props) {
                     isDir
                     size={0}
                     onOpen={() => setLocalPath(parentDir(localPath))}
+                    icon={<CornerLeftUp className="h-3.5 w-3.5 shrink-0 text-accent" />}
                   />
                 )}
                 {localEntries.map((e) => (
@@ -407,6 +409,7 @@ export function SftpExplorer({ session }: Props) {
                     isDir
                     size={0}
                     onOpen={() => void loadRemote(parentDir(remotePath))}
+                    icon={<CornerLeftUp className="h-3.5 w-3.5 shrink-0 text-accent" />}
                   />
                 )}
                 {remoteEntries.map((e) => (
@@ -482,6 +485,7 @@ function FileRow({
   onAction,
   actionTitle,
   secondAction,
+  icon,
 }: {
   name: string;
   isDir: boolean;
@@ -495,6 +499,8 @@ function FileRow({
     onClick: () => void;
     title: string;
   };
+  /** Optional icon override; falls back to a folder/file glyph by `isDir`. */
+  icon?: React.ReactNode;
 }) {
   return (
     <div
@@ -506,11 +512,11 @@ function FileRow({
       }}
       className="group flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-bg-overlay"
     >
-      {isDir ? (
+      {icon ?? (isDir ? (
         <Folder className="h-3.5 w-3.5 shrink-0 text-accent" />
       ) : (
         <File className="h-3.5 w-3.5 shrink-0 text-fg-subtle" />
-      )}
+      ))}
       <span className="min-w-0 flex-1 truncate text-fg">{name}</span>
       {!isDir && (
         <span className="shrink-0 text-fg-subtle">{formatSize(size)}</span>
