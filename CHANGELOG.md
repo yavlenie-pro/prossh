@@ -4,6 +4,17 @@ All notable changes to **ProSSH** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-05-08
+
+### Added
+- SFTP file browser shows a virtual `..` row at the top of each panel
+  (local and remote) when the current directory is not a filesystem
+  root. Double-clicking it ascends one level. Hidden at POSIX `/` and
+  Windows drive roots.
+- Tabs in the title bar can now be reordered by drag-and-drop. A thin
+  accent bar between tabs marks the prospective insert position; the
+  dragged tab dims for visual feedback.
+
 ## [0.1.1] — 2026-05-04
 
 ### Added
