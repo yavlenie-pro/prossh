@@ -141,6 +141,19 @@ export function SftpExplorer({ session }: Props) {
     return "/" + parts.join("/");
   };
 
+  /**
+   * True if `path` is a filesystem root and has no parent to ascend to.
+   * Used to decide whether to render a virtual `..` row at the top of a panel.
+   *
+   * - POSIX root: `/`
+   * - Windows drive roots: `C:`, `C:\`, `C:/`
+   */
+  const isRoot = (path: string): boolean => {
+    if (!path) return true;
+    if (path === "/") return true;
+    return /^[A-Za-z]:[\\/]?$/.test(path);
+  };
+
   const handleUpload = async (entry: LocalEntry) => {
     if (!runtimeIdRef.current || entry.isDir) return;
     const transferId = nanoid();
@@ -322,18 +335,29 @@ export function SftpExplorer({ session }: Props) {
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Loading…
               </div>
             ) : (
-              localEntries.map((e) => (
-                <FileRow
-                  key={e.path}
-                  name={e.name}
-                  isDir={e.isDir}
-                  size={e.size}
-                  onOpen={() => e.isDir && setLocalPath(e.path)}
-                  actionIcon={!e.isDir ? <Upload className="h-3 w-3" /> : undefined}
-                  onAction={() => void handleUpload(e)}
-                  actionTitle="Upload"
-                />
-              ))
+              <>
+                {!isRoot(localPath) && (
+                  <FileRow
+                    key="__parent__"
+                    name=".."
+                    isDir
+                    size={0}
+                    onOpen={() => setLocalPath(parentDir(localPath))}
+                  />
+                )}
+                {localEntries.map((e) => (
+                  <FileRow
+                    key={e.path}
+                    name={e.name}
+                    isDir={e.isDir}
+                    size={e.size}
+                    onOpen={() => e.isDir && setLocalPath(e.path)}
+                    actionIcon={!e.isDir ? <Upload className="h-3 w-3" /> : undefined}
+                    onAction={() => void handleUpload(e)}
+                    actionTitle="Upload"
+                  />
+                ))}
+              </>
             )}
           </div>
         </div>
@@ -375,37 +399,48 @@ export function SftpExplorer({ session }: Props) {
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Loading…
               </div>
             ) : (
-              remoteEntries.map((e) => (
-                <FileRow
-                  key={e.path}
-                  name={e.name}
-                  isDir={e.isDir}
-                  size={e.size}
-                  onOpen={() => e.isDir && void loadRemote(e.path)}
-                  actionIcon={
-                    e.isDir ? (
-                      <Trash2 className="h-3 w-3" />
-                    ) : (
-                      <Download className="h-3 w-3" />
-                    )
-                  }
-                  onAction={() =>
-                    e.isDir
-                      ? void handleRemoteDelete(e)
-                      : void handleDownload(e)
-                  }
-                  actionTitle={e.isDir ? "Delete" : "Download"}
-                  secondAction={
-                    !e.isDir
-                      ? {
-                          icon: <Trash2 className="h-3 w-3" />,
-                          onClick: () => void handleRemoteDelete(e),
-                          title: "Delete",
-                        }
-                      : undefined
-                  }
-                />
-              ))
+              <>
+                {!isRoot(remotePath) && (
+                  <FileRow
+                    key="__parent__"
+                    name=".."
+                    isDir
+                    size={0}
+                    onOpen={() => void loadRemote(parentDir(remotePath))}
+                  />
+                )}
+                {remoteEntries.map((e) => (
+                  <FileRow
+                    key={e.path}
+                    name={e.name}
+                    isDir={e.isDir}
+                    size={e.size}
+                    onOpen={() => e.isDir && void loadRemote(e.path)}
+                    actionIcon={
+                      e.isDir ? (
+                        <Trash2 className="h-3 w-3" />
+                      ) : (
+                        <Download className="h-3 w-3" />
+                      )
+                    }
+                    onAction={() =>
+                      e.isDir
+                        ? void handleRemoteDelete(e)
+                        : void handleDownload(e)
+                    }
+                    actionTitle={e.isDir ? "Delete" : "Download"}
+                    secondAction={
+                      !e.isDir
+                        ? {
+                            icon: <Trash2 className="h-3 w-3" />,
+                            onClick: () => void handleRemoteDelete(e),
+                            title: "Delete",
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+              </>
             )}
           </div>
         </div>
