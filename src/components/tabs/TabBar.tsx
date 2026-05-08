@@ -1,5 +1,11 @@
 import { Folder, X } from "lucide-react";
-import { Fragment, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { detectOsFromSession, OsIcon, osColor } from "@/components/ui/OsIcon";
@@ -14,9 +20,18 @@ import { useTabsStore } from "@/stores/tabs";
  * shows the host's OS icon next to the label. An unread-output dot appears
  * on inactive tabs that produced output since they were last focused.
  *
- * Tabs are reorderable by drag-and-drop: grabbing a tab and dropping it on
- * another inserts the dragged tab to that side of the target. A thin accent
- * line is rendered between tabs to indicate the upcoming insert position.
+ * Tabs are reorderable by drag-and-drop, but we deliberately do NOT use the
+ * native HTML5 dnd API here. Tauri 2 on Windows installs an OS-level
+ * drag-and-drop handler on the webview (controlled by `dragDropEnabled`)
+ * that hijacks the mouse mid-drag, which manifests as a "no-drop" cursor
+ * and a never-firing `drop` event. Disabling that handler is the documented
+ * workaround, but it would also break the Tauri `onDragDropEvent` listener
+ * the sidebar's file browser relies on for "drop file from Explorer to
+ * upload". Manual mouse tracking sidesteps the conflict entirely while
+ * keeping the OS file-drop integration intact.
+ *
+ * The drag is initiated when the cursor leaves a small dead-zone (4 px) so
+ * a normal click still activates the tab.
  */
 export function TabBar() {
   const tabs = useTabsStore((s) => s.tabs);
@@ -26,47 +41,93 @@ export function TabBar() {
   const reorderTabs = useTabsStore((s) => s.reorderTabs);
 
   /**
-   * `draggingId` — id of the tab currently being dragged. Tracked in BOTH a
-   * ref (read synchronously from event handlers, so the very first
-   * `dragover` after `dragstart` sees the new value before React commits the
-   * next render) and React state (drives the dimmed-tab visual). Without the
-   * ref the first `dragover` reads a stale closure where the id is still
-   * null, the early return skips `preventDefault`, and the browser shows the
-   * "no-drop" cursor for the rest of the drag.
-   *
-   * `dropIndex` — insert-before position in the *current* tab array; null
-   * when the prospective drop is a no-op (back to the same place).
+   * `draggingId` — id of the tab currently being dragged (drives the dim
+   * visual). `dropIndex` — insert-before position in the *current* tab
+   * array; null both when idle and when the prospective drop is a no-op
+   * (back to the same place).
    */
-  const draggingIdRef = useRef<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
+  /** Container ref so we can read tab rects relative to it. */
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Latest tabs snapshot, accessed from native event handlers attached to
+   * `window`. Without this the global listeners would close over the array
+   * from the render that armed them and miss new tabs / removals.
+   */
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
   if (tabs.length === 0) return null;
 
-  const handleDragStart = (e: React.DragEvent, tabId: string) => {
-    draggingIdRef.current = tabId;
-    setDraggingId(tabId);
-    e.dataTransfer.effectAllowed = "move";
-    // Some browsers require dataTransfer to be set for the drag to start.
-    e.dataTransfer.setData("text/plain", tabId);
+  /**
+   * Begin a manual drag gesture. We don't immediately mark the tab as
+   * dragging — only after the cursor has moved past a small threshold, so
+   * a clean click on a tab still activates it.
+   */
+  const beginDrag = (e: React.MouseEvent, tabId: string) => {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const THRESHOLD = 4;
+    let started = false;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!started) {
+        if (
+          Math.abs(ev.clientX - startX) < THRESHOLD &&
+          Math.abs(ev.clientY - startY) < THRESHOLD
+        ) {
+          return;
+        }
+        started = true;
+        setDraggingId(tabId);
+        document.body.style.cursor = "grabbing";
+        document.body.style.userSelect = "none";
+      }
+      updateDropIndex(ev.clientX, tabId);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (started) {
+        commitDrop(tabId);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+      setDraggingId(null);
+      setDropIndex(null);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
-  const handleDragEnd = () => {
-    draggingIdRef.current = null;
-    setDraggingId(null);
-    setDropIndex(null);
-  };
+  /**
+   * Recompute the drop position from the cursor's X coordinate. We look at
+   * each tab's bounding rect and find the gap closest to the cursor. The
+   * indicator is suppressed for no-op moves (target is the source's own
+   * slot or the slot immediately after).
+   */
+  const updateDropIndex = (clientX: number, dragId: string) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const tabEls = container.querySelectorAll<HTMLElement>('[data-tab-id]');
+    if (tabEls.length === 0) return;
 
-  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
-    const dragId = draggingIdRef.current;
-    if (!dragId) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const after = e.clientX - rect.left > rect.width / 2;
-    const candidate = after ? targetIndex + 1 : targetIndex;
-    const fromIndex = tabs.findIndex((t) => t.id === dragId);
-    // Hide the indicator when the resulting move would be a no-op.
+    const fromIndex = tabsRef.current.findIndex((t) => t.id === dragId);
+    let candidate = tabEls.length; // default = drop at end
+    for (let i = 0; i < tabEls.length; i++) {
+      const r = tabEls[i].getBoundingClientRect();
+      if (clientX < r.left + r.width / 2) {
+        candidate = i;
+        break;
+      }
+    }
+
     if (candidate === fromIndex || candidate === fromIndex + 1) {
       setDropIndex(null);
     } else {
@@ -74,25 +135,36 @@ export function TabBar() {
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const dragId = draggingIdRef.current;
-    const fromIndex = dragId ? tabs.findIndex((t) => t.id === dragId) : -1;
-    if (fromIndex !== -1 && dropIndex !== null) {
-      // dropIndex is "insert before" in the pre-move array. Convert it to the
-      // post-move array index expected by reorderTabs (which lands the moved
-      // tab exactly at toIndex).
-      let toIndex = dropIndex;
+  /**
+   * Apply the queued drop. `dropIndex` uses insert-before semantics on the
+   * pre-move array; convert it to the target index `reorderTabs` expects
+   * (where the moved tab lands exactly at `toIndex` in the post-move
+   * array).
+   */
+  const commitDrop = (dragId: string) => {
+    setDropIndex((current) => {
+      if (current === null) return null;
+      const fromIndex = tabsRef.current.findIndex((t) => t.id === dragId);
+      if (fromIndex === -1) return null;
+      let toIndex = current;
       if (toIndex > fromIndex) toIndex--;
       if (toIndex !== fromIndex) reorderTabs(fromIndex, toIndex);
-    }
-    draggingIdRef.current = null;
-    setDraggingId(null);
-    setDropIndex(null);
+      return null;
+    });
   };
+
+  // Safety net: clear any leftover body styles if the component unmounts
+  // while a drag is in progress.
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, []);
 
   return (
     <div
+      ref={containerRef}
       role="tablist"
       data-tauri-drag-region
       className="flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto pl-1 pr-2 pt-1"
@@ -106,10 +178,7 @@ export function TabBar() {
             dragging={draggingId === tab.id}
             onActivate={() => activateTab(tab.id)}
             onClose={() => closeTab(tab.id)}
-            onDragStart={(e) => handleDragStart(e, tab.id)}
-            onDragEnd={handleDragEnd}
-            onDragOver={(e) => handleDragOver(e, i)}
-            onDrop={handleDrop}
+            onMouseDownDrag={(e) => beginDrag(e, tab.id)}
           />
         </Fragment>
       ))}
@@ -134,20 +203,14 @@ function TabButton({
   dragging,
   onActivate,
   onClose,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDrop,
+  onMouseDownDrag,
 }: {
   tab: Tab;
   active: boolean;
   dragging: boolean;
   onActivate: () => void;
   onClose: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragEnd: (e: React.DragEvent) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
+  onMouseDownDrag: (e: React.MouseEvent) => void;
 }) {
   const { t } = useTranslation();
   const unread = useTabsStore((s) => !!s.unreadTabs[tab.id]);
@@ -166,13 +229,20 @@ function TabButton({
       role="tab"
       tabIndex={0}
       aria-selected={active}
-      draggable
+      data-tab-id={tab.id}
       onClick={onActivate}
       onMouseDown={(e) => {
         // Middle-click closes the tab (matches Chrome / VS Code / WT).
         if (e.button === 1) {
           e.preventDefault();
           onClose();
+          return;
+        }
+        // Left-button: arm the manual drag tracker. It only activates after
+        // the cursor moves past a small threshold, so a normal click still
+        // selects the tab via `onClick`.
+        if (e.button === 0) {
+          onMouseDownDrag(e);
         }
       }}
       onKeyDown={(e) => {
@@ -181,12 +251,8 @@ function TabButton({
           onActivate();
         }
       }}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
       className={cn(
-        "group relative flex min-w-[140px] max-w-[240px] flex-1 cursor-pointer items-center gap-2 overflow-hidden rounded-t-md border-x border-t px-3 text-xs transition-colors",
+        "group relative flex min-w-[140px] max-w-[240px] flex-1 cursor-pointer select-none items-center gap-2 overflow-hidden rounded-t-md border-x border-t px-3 text-xs transition-colors",
         active
           ? "border-border-subtle bg-bg text-fg"
           : "border-transparent text-fg-muted hover:bg-bg-overlay hover:text-fg",
@@ -220,6 +286,10 @@ function TabButton({
         onClick={(e) => {
           e.stopPropagation();
           onClose();
+        }}
+        onMouseDown={(e) => {
+          // Don't initiate a drag when the user is aiming at the close button.
+          e.stopPropagation();
         }}
         className={cn(
           "shrink-0 rounded p-0.5 text-fg-subtle hover:bg-danger/20 hover:text-danger",
